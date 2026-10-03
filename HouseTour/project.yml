@@ -1,0 +1,32 @@
+name: HouseTour
+options:
+  bundleIdPrefix: com.edisonhui
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: 9XPPP9TMHQ
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  HouseTour:
+    type: application
+    platform: iOS
+    sources:
+      - HouseTour
+    info:
+      path: HouseTour/Info.plist
+      properties:
+        CFBundleDisplayName: House Tour
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        NSLocalNetworkUsageDescription: Lets a laptop on the same Wi-Fi show the floor plan live while you explore.
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.edisonhui.housetour

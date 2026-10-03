@@ -1,0 +1,323 @@
+import Combine
+import SwiftUI
+import UIKit
+
+/// The touch surface, used like a laptop trackpad. One finger drags the avatar
+/// by the finger's movement, never to where the finger is, so seeing the map
+/// gives no shortcut. Single tap says the room; two-finger tap asks "where am
+/// I"; triple tap finds the front door. Marked `allowsDirectInteraction` so raw
+/// touches reach it while VoiceOver is on.
+final class FloorMapView: UIView {
+    var explorer: Explorer!
+    var onTouch: (() -> Void)?
+    var onWhereAmI: (() -> Void)?
+    var onFindDoor: (() -> Void)?
+
+    /// Feet of avatar movement per point of finger movement. A full-width swipe
+    /// (about 390 points) covers roughly 35 ft, two or three rooms.
+    static let feetPerPoint = 0.09
+    /// Fine movement divides the gain by this, for lining up with a doorway.
+    static let fineDivisor = 3.0
+
+    /// Off: a plain dark surface. On: the plan and avatar dot, for people watching.
+    var showMap = false {
+        didSet {
+            guard showMap != oldValue else { return }
+            backgroundColor = showMap ? UIColor(white: 0.93, alpha: 1) : UIColor(white: 0.08, alpha: 1)
+            hint.isHidden = showMap
+            setNeedsDisplay()
+            updateDot()
+        }
+    }
+    var floorIndex = 0 { didSet { setNeedsDisplay() } }
+
+    private var images: [Int: UIImage] = [:]
+    private let dot = CAShapeLayer()
+    private let hint = UILabel()
+
+    private var tracking: UITouch?
+    private var touchStart = Date()
+    private var startPoint = CGPoint.zero
+    private var lastPoint = CGPoint.zero
+    private var movedFar = false
+    private var multiStart: Date?
+    private var multiMoved = false
+    private var tapTimes: [Date] = []
+    private var announceWork: DispatchWorkItem?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isMultipleTouchEnabled = true
+        backgroundColor = UIColor(white: 0.08, alpha: 1)
+        contentMode = .redraw
+        dot.fillColor = UIColor.systemRed.withAlphaComponent(0.55).cgColor
+        dot.strokeColor = UIColor.white.cgColor
+        dot.lineWidth = 2
+        layer.addSublayer(dot)
+
+        hint.text = "Drag to move. Two-finger tap: where am I. Triple tap: front door."
+        hint.textColor = UIColor(white: 0.6, alpha: 1)
+        hint.font = .preferredFont(forTextStyle: .body)
+        hint.numberOfLines = 0
+        hint.textAlignment = .center
+        hint.isAccessibilityElement = false
+        hint.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(hint)
+        NSLayoutConstraint.activate([
+            hint.centerYAnchor.constraint(equalTo: centerYAnchor),
+            hint.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 32),
+            hint.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -32),
+        ])
+
+        isAccessibilityElement = true
+        accessibilityLabel = "Touch surface"
+        accessibilityHint = "Drag to move. Single tap for the room. Two finger tap for where am I. Triple tap to find the front door."
+        accessibilityTraits = .allowsDirectInteraction
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    // MARK: Drawing (map shown only)
+
+    private var scale: CGFloat {
+        guard let house = explorer?.house, house.width > 0 else { return 1 }
+        return min(bounds.width / house.width, bounds.height / house.height)
+    }
+
+    private func toPoints(_ p: CGPoint) -> CGPoint {
+        guard let house = explorer?.house else { return p }
+        let origin = CGPoint(x: (bounds.width - house.width * scale) / 2, y: (bounds.height - house.height * scale) / 2)
+        return CGPoint(x: p.x * scale + origin.x, y: p.y * scale + origin.y)
+    }
+
+    override func draw(_ rect: CGRect) {
+        guard showMap, let explorer else { return }
+        let image = images[floorIndex] ?? {
+            let img = FloorRenderer.render(explorer.house, floor: floorIndex)
+            images[floorIndex] = img
+            return img
+        }()
+        let house = explorer.house
+        let topLeft = toPoints(.zero)
+        image.draw(in: CGRect(x: topLeft.x, y: topLeft.y, width: house.width * scale, height: house.height * scale))
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateDot()
+    }
+
+    func updateDot() {
+        guard showMap, let p = explorer?.position else {
+            dot.path = nil
+            return
+        }
+        let c = toPoints(p)
+        dot.path = UIBezierPath(ovalIn: CGRect(x: c.x - 11, y: c.y - 11, width: 22, height: 22)).cgPath
+    }
+
+    // MARK: Touches
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        onTouch?()
+        let all = event?.allTouches?.filter { $0.view === self && $0.phase != .ended && $0.phase != .cancelled } ?? touches
+        if all.count >= 2 {
+            // Second finger landed: this is a gesture, not walking.
+            announceWork?.cancel()
+            if tracking != nil {
+                tracking = nil
+                explorer.touchUp()
+            }
+            if multiStart == nil {
+                multiStart = Date()
+                multiMoved = false
+            }
+            return
+        }
+        guard tracking == nil, multiStart == nil, let t = touches.first else { return }
+        tracking = t
+        touchStart = Date()
+        startPoint = t.location(in: self)
+        lastPoint = startPoint
+        movedFar = false
+        announceWork?.cancel()
+        explorer.touchDown()
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if multiStart != nil {
+            if touches.contains(where: { $0.location(in: self).distance(to: $0.previousLocation(in: self)) > 8 }) {
+                multiMoved = true
+            }
+            return
+        }
+        guard let t = tracking, touches.contains(t) else { return }
+        let p = t.location(in: self)
+        if p.distance(to: startPoint) > 12 { movedFar = true }
+        // Ignore finger jitter until it's clearly a drag, so taps never nudge the avatar.
+        guard movedFar || p.distance(to: startPoint) > 6 else { return }
+        let gain = Self.feetPerPoint / (Setting.fineMovement.isOn ? Self.fineDivisor : 1)
+        explorer.drag(by: CGVector(dx: (p.x - lastPoint.x) * gain, dy: (p.y - lastPoint.y) * gain))
+        lastPoint = p
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        endTouches(touches, event: event, cancelled: false)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        endTouches(touches, event: event, cancelled: true)
+    }
+
+    private func endTouches(_ touches: Set<UITouch>, event: UIEvent?, cancelled: Bool) {
+        let remaining = event?.allTouches?.filter {
+            $0.view === self && !touches.contains($0) && $0.phase != .ended && $0.phase != .cancelled
+        }
+        if let start = multiStart {
+            guard remaining?.isEmpty ?? true else { return }
+            multiStart = nil
+            if !cancelled, !multiMoved, Date().timeIntervalSince(start) < 0.5 { onWhereAmI?() }
+            return
+        }
+        guard let t = tracking, touches.contains(t) else { return }
+        tracking = nil
+        explorer.touchUp()
+        guard !cancelled else { return }
+
+        let isTap = Date().timeIntervalSince(touchStart) < 0.25 && !movedFar
+        guard isTap else {
+            tapTimes = []
+            return
+        }
+        announceWork?.cancel()
+        let now = Date()
+        tapTimes = tapTimes.filter { now.timeIntervalSince($0) < 0.9 } + [now]
+        if tapTimes.count >= 3 {
+            tapTimes = []
+            onFindDoor?()
+            return
+        }
+        // Wait to see whether more taps follow; a lone tap says where you are.
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.tapTimes.count == 1 else { return }
+            self.tapTimes = []
+            self.explorer.announceLocation()
+        }
+        announceWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+}
+
+/// Draws a floor once into an image, for sighted teammates and judges when
+/// "Show map" is on.
+enum FloorRenderer {
+    static let pxPerFoot: CGFloat = 24
+
+    static func color(_ floor: FloorType) -> UIColor {
+        switch floor {
+        case .hardwood: UIColor(red: 0.93, green: 0.80, blue: 0.62, alpha: 1)
+        case .carpet: UIColor(red: 0.84, green: 0.84, blue: 0.95, alpha: 1)
+        case .tile: UIColor(red: 0.74, green: 0.89, blue: 0.95, alpha: 1)
+        case .concrete: UIColor(white: 0.82, alpha: 1)
+        case .deck: UIColor(red: 0.80, green: 0.70, blue: 0.58, alpha: 1)
+        case .unknown: UIColor(red: 0.97, green: 0.95, blue: 0.85, alpha: 1)
+        }
+    }
+
+    static func render(_ house: House, floor index: Int) -> UIImage {
+        let floor = house.floors[index]
+        let s = pxPerFoot * CGFloat(floor.cellSize)
+        let size = CGSize(width: CGFloat(house.width) * pxPerFoot, height: CGFloat(house.height) * pxPerFoot)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            let cg = ctx.cgContext
+            for r in 0..<floor.rows {
+                for c in 0..<floor.cols {
+                    let center = CGPoint(x: (Double(c) + 0.5) * floor.cellSize, y: (Double(r) + 0.5) * floor.cellSize)
+                    let fill: UIColor?
+                    switch floor.kind(at: center) {
+                    case .wall: fill = .black
+                    case .window: fill = .systemBlue
+                    case .screen: fill = .systemTeal
+                    case .railing: fill = .systemOrange
+                    case .void: fill = UIColor(white: 0.6, alpha: 1)
+                    case .open: fill = floor.roomIndex(at: center).map { color(floor.rooms[$0].floor) }
+                    }
+                    guard let fill else { continue }
+                    cg.setFillColor(fill.cgColor)
+                    cg.fill(CGRect(x: CGFloat(c) * s, y: CGFloat(r) * s, width: s + 0.5, height: s + 0.5))
+                }
+            }
+            // Stair treads.
+            cg.setStrokeColor(UIColor(white: 0.35, alpha: 1).cgColor)
+            cg.setLineWidth(2)
+            for room in floor.rooms where room.isStairs {
+                let rect = room.rect.scaled(pxPerFoot)
+                var x = rect.minX + 12
+                while x < rect.maxX {
+                    cg.move(to: CGPoint(x: x, y: rect.minY))
+                    cg.addLine(to: CGPoint(x: x, y: rect.maxY))
+                    x += 18
+                }
+            }
+            cg.strokePath()
+            for fixture in floor.fixtures {
+                cg.setFillColor(UIColor.brown.cgColor)
+                cg.fill(fixture.cgRect.scaled(pxPerFoot))
+            }
+            // Front door marker.
+            if house.frontDoor.floor == index {
+                let p = house.frontDoor.point
+                let d = CGRect(x: p.x * pxPerFoot - 22, y: p.y * pxPerFoot - 10, width: 44, height: 20)
+                cg.setFillColor(UIColor.systemGreen.cgColor)
+                cg.fill(d)
+            }
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 26, weight: .semibold),
+                .foregroundColor: UIColor(white: 0.15, alpha: 1),
+            ]
+            for room in floor.rooms where !room.isCloset && !room.isStairs {
+                let text = room.name as NSString
+                let rect = room.rect.scaled(pxPerFoot)
+                let sz = text.size(withAttributes: attrs)
+                text.draw(at: CGPoint(x: rect.midX - sz.width / 2, y: rect.midY - sz.height / 2), withAttributes: attrs)
+            }
+        }
+    }
+}
+
+extension CGRect {
+    fileprivate func scaled(_ k: CGFloat) -> CGRect {
+        CGRect(x: minX * k, y: minY * k, width: width * k, height: height * k)
+    }
+}
+
+/// SwiftUI wrapper.
+struct FloorMap: UIViewRepresentable {
+    @ObservedObject var app: AppModel
+    let showMap: Bool
+
+    func makeUIView(context: Context) -> FloorMapView {
+        let view = FloorMapView()
+        view.explorer = app.explorer
+        view.onTouch = { app.interrupt() }
+        view.onWhereAmI = { app.explorer.whereAmI() }
+        view.onFindDoor = { app.findFrontDoor() }
+        context.coordinator.positionSink = app.explorer.$position
+            .receive(on: DispatchQueue.main)
+            .sink { [weak view] _ in view?.updateDot() }
+        return view
+    }
+
+    func updateUIView(_ view: FloorMapView, context: Context) {
+        if view.floorIndex != app.explorer.floorIndex { view.floorIndex = app.explorer.floorIndex }
+        view.showMap = showMap
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var positionSink: AnyCancellable?
+    }
+}

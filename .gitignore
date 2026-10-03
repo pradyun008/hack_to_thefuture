@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# House Tour
+tools/source/
+tools/out/
+HouseTour/build/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+.DS_Store
