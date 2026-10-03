@@ -11,7 +11,7 @@ struct Tutorial {
 
     func run() async {
         var lessons: [(String, () async -> Void)] = [
-            ("Drag one finger to walk, like a trackpad. Lifting never moves you. The trackpad turns with you: drag up to walk ahead, left to go left. When you lift, you face the way you walked. You start inside the front door, facing in.", {}),
+            ("Press one finger anywhere and hold it. Where you pressed becomes the centre, and pushing away from it walks you: the further you push, the faster you go. Lifting stops you. The centre turns with you, so push up to walk ahead, left to go left. When you lift, you face the way you walked. You start inside the front door, facing in.", {}),
             ("Wall. A hard knock, repeating while you push.", { haptics.wall() }),
             ("Window. A glassy double tap.", { haptics.window() }),
             ("A railing, where the floor drops away.", { haptics.railing() }),
@@ -35,7 +35,7 @@ struct Tutorial {
             ("Something built in, like a fireplace.", { haptics.fixture() }),
             ("Stairs. Hold still on them, finger down, to change floors.", { haptics.stairs(up: true) }),
             ("With headphones, this chime comes from the front door's direction. The find front door button plays it.", { audio.chime() }),
-            ("You walk a set path through the house, so you can't get lost. Drag to go along it, drag back to return. Double tap to step off and feel a room yourself, and double tap again to come back.", {}),
+            ("You walk a set path through the house, so you can't get lost. Push forward to go along it, back to return. Double tap to step off and feel a room yourself, and double tap again to come back.", {}),
             ("Single tap says your room, and on the tour, the way to the next stop. Triple tap gives the room, nearest wall, and nearest door. Settings can switch off any sound or vibration.", {}),
         ]
         for (line, demo) in lessons {
