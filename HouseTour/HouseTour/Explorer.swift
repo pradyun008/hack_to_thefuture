@@ -54,7 +54,6 @@ final class Explorer: ObservableObject {
     private var stairsArmed = true
     private var railRun = 0      // which storey's stretch of the route
     private var railPos = 0.0    // feet along that stretch
-    private var beaconBoostUntil = Date.distantPast
     private var timer: Timer?
 
     static let stride = 2.5          // ft per virtual footstep
@@ -263,21 +262,6 @@ final class Explorer: ObservableObject {
             parts.append("\(doorName(floor.doors[i], from: currentRoom)) \(place(from: p, to: spot, heading: heading))")
         }
         speech.request(parts.joined(separator: ". ") + ".")
-    }
-
-    /// The reset button for when someone is lost. Points the way and plays the
-    /// beacon loudly for a few seconds, even if the beacon is switched off.
-    /// Dropped entirely while something is being said.
-    func findFrontDoor() {
-        let p = position
-        let sameFloor = floorIndex == house.frontDoor.floor
-        guard speech.request(frontDoorHint(from: p) + (sameFloor ? ". Follow the chime." : ".")) else { return }
-        haptics.frontDoor()
-        guard sameFloor else { return }
-        beaconBoostUntil = Date().addingTimeInterval(6)
-        updateBeacon()
-        audio.boostBeacon()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6.1) { [weak self] in self?.updateBeacon() }
     }
 
     /// How to get to `target` in room `room` on this floor: through the first
@@ -572,11 +556,9 @@ final class Explorer: ObservableObject {
         haptics.proximity(Float(0.12 + 0.55 * (1 - d / Self.warningZone)))
     }
 
-    /// The beacon plays while touching if it's switched on, and for a few
-    /// seconds after "find the front door" regardless.
+    /// The beacon plays while touching, if it's switched on.
     private func updateBeacon() {
-        let boosted = Date() < beaconBoostUntil
-        audio.setBeacon(floorIndex == house.frontDoor.floor && (boosted || (touching && Setting.beacon.isOn)))
+        audio.setBeacon(floorIndex == house.frontDoor.floor && touching && Setting.beacon.isOn)
     }
 
     private func startTimer() {
@@ -650,21 +632,6 @@ final class Explorer: ObservableObject {
         guard let first = main.first else { return Array(doors.prefix(1)) }
         if main.count > 1, floor.distance(toDoor: main[1], from: p) <= 10 { return [first, main[1]] }
         return [first]
-    }
-
-    /// Always names the front door, never just "the door". Off its floor it
-    /// also points to the stairs.
-    private func frontDoorHint(from p: CGPoint) -> String {
-        let door = house.frontDoor
-        guard floorIndex == door.floor else {
-            let side = floorIndex > door.floor ? "downstairs" : "upstairs"
-            if isOnStairs { return "Front door \(side). You're on the stairs" }
-            guard let s = floor.stairsIndex else { return "Front door \(side)" }
-            let r = floor.rooms[s].rect
-            let c = CGPoint(x: r.midX, y: r.midY)
-            return "Front door \(side). Stairs \(place(from: p, to: c, heading: heading))"
-        }
-        return "Front door \(place(from: p, to: door.point, heading: heading))"
     }
 
     /// "Wall on your left", turned to the way you're facing.

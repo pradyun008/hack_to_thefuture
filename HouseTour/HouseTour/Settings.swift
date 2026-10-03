@@ -26,7 +26,7 @@ enum Setting: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .wallHum: "A vibration that grows as you get close to a wall."
-        case .beacon: "A repeating chime placed at the front door. The find front door button plays it for a few seconds either way."
+        case .beacon: "A repeating chime placed at the front door."
         case .textures: "A pattern every few steps that tells hardwood, carpet, tile, concrete, and deck apart."
         case .wind: "Loops quietly while you are outside the house."
         case .speakRooms: "Says the room name when you walk into it."
@@ -56,6 +56,8 @@ enum Setting: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    /// Closes the sheet and plays the haptic tutorial.
+    let replayTutorial: () -> Void
     @AppStorage(DemoHouse.key) private var demoHouse = DemoHouse.current
 
     private var viewerHint: String {
@@ -78,6 +80,9 @@ struct SettingsView: View {
                     ForEach(Setting.allCases) { SettingRow(setting: $0) }
                 } footer: {
                     Text(viewerHint)
+                }
+                Section {
+                    Button("Replay haptic tutorial", action: replayTutorial)
                 }
             }
             .navigationTitle("Settings")

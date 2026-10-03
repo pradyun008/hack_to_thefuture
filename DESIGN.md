@@ -33,7 +33,7 @@ The route doubles back on itself — out to the half bath and in again along
 nearly the same line — so one spot on the floor can be two places on the route,
 40 ft apart along it. Snapping back prefers the pass you were already on, and
 tour stops are found by their step number rather than their coordinates, so
-"Jump to room" and "ahead along the path" can't end up facing backwards.
+"ahead along the path" can't end up facing backwards.
 
 While on the path the tour gives distances along it ("Ahead along the path,
 4 steps") instead of bearings, since a bearing is noise when there is
@@ -66,7 +66,7 @@ everything-on overwhelming.
 | Switch | Default |
 |---|---|
 | Wall approach hum | Off |
-| Front door chime while touching | Off (the find front door button plays it for 6 s anyway) |
+| Front door chime while touching | Off |
 | Floor texture vibration | On |
 | Wind sound outside | Off |
 | Speak room names | On |
@@ -101,7 +101,7 @@ numbs the hand. There is no footstep sound; floors are felt only.
 
 | Sound | What it tells you | When |
 |---|---|---|
-| Front door beacon | Direction and distance to the entrance | Two-note chime every 1.5 s, placed in 3D at the door. While touching if switched on. The find front door button plays it louder for 6 s either way |
+| Front door beacon | Direction and distance to the entrance | Two-note chime every 1.5 s, placed in 3D at the door. While touching if switched on |
 | Front door chime | You're at the front door | Once per arrival |
 | Wind | You've left the house | Only if switched on |
 
@@ -120,7 +120,6 @@ and fixture names are dropped while it plays, since they'd be stale by the end.
 | Single tap | The room | "Living room." |
 | Double tap | Leaving the path, or rejoining it | "Off the path. Double tap to come back." "Back on the path. Kitchen." |
 | Triple tap | Floor, room, nearest wall, nearest door | "First floor, Kitchen. Wall on your left. Opening to Dining area on your right, 2 steps." |
-| Find front door button | Way to the front door | "Front door behind you, 5 steps. Follow the chime." |
 | Stairs | Direction and how to use them | "Stairs up. Hold still to climb." |
 | Guided tour | The next stop and how to get there | "Next, Kitchen. Ahead along the path, 4 steps." Off the path: "Next, Kitchen. Door ahead right, 3 steps." "Next, Laundry room. Through the door to Family room behind you, 3 steps." |
 
@@ -129,8 +128,7 @@ Spoken lines are kept short because every word costs listening time:
 - Lead with the thing, then where: "Front door behind you, 7 steps." No "The
   front door is", "It's", or "There's".
 - Never repeat what was just said. The tour names the next stop, so a door
-  straight into it is only "Door". "Jump to room" plays the room's narration,
-  which opens with its name, so there's no "Jumped to" line.
+  straight into it is only "Door".
 - Step counts are rounded already, so no "about".
 - Eight directions: ahead, ahead left, ahead right, on your left, on your
   right, back left, back right, behind you.
@@ -161,8 +159,7 @@ chatter.
    stairs stop counts when you step onto the stairs). Then it points to the
    next stop. Walking for 10 s without getting closer repeats the directions,
    and a single tap asks for them. To change floors you hold still on the
-   stairs as usual. "Previous room" aims back one stop, "Restart tour" returns
-   to the front door, and "Jump to room" moves you to any stop and plays it.
+   stairs as usual. Starting the tour again returns you to the front door.
    Because the tour's stops all lie on the path, walking the path walks the
    tour: the two cannot disagree about where a stop is.
    Finishing the tour is remembered, so later launches start in free explore.
