@@ -345,13 +345,9 @@ final class Explorer: ObservableObject {
     func route(to target: CGPoint, room: Int?, tourStep: Int? = nil, name: String? = nil) -> String {
         let p = position
         // On the rail there's nowhere to go but along it, so a bearing would be
-        // noise: how far, and which way round, is the whole answer.
+        // noise. Which way round, the rooms on the way, and how far is the answer.
         if onRail, let rail, rail.runs[railRun].floor == floorIndex {
-            let exact = tourStep.flatMap { rail.location(ofTourStep: $0) }
-            let s = exact?.run == railRun ? exact!.s : rail.project(target, run: railRun, near: railPos)
-            let d = s - railPos
-            if abs(d) < 1.5 { return "Right here on the path." }
-            return "\(d > 0 ? "Ahead" : "Back") along the path, \(steps(abs(d)))."
+            return railRoute(rail, to: target, room: room, tourStep: tourStep)
         }
         if let here = currentRoom ?? lastLabel, let goal = room, let i = floor.firstDoor(from: here, to: goal) {
             let spot = floor.nearestPoint(onDoor: i, from: p)
@@ -365,6 +361,130 @@ final class Explorer: ObservableObject {
         let there = place(from: p, to: target, heading: heading)
         if let name { return "\(name) \(there)." }
         return there.prefix(1).uppercased() + there.dropFirst() + "."
+    }
+
+    /// "Back along the path through Living room, 12 steps." Leads to the
+    /// nearest spot, in steps, where the path enters `room`, then on through
+    /// the room to within 4 ft of `target` if this pass gets that close. The
+    /// path doubles back, so the spot nearest in a straight line can be the
+    /// far pass. If the path never enters `room`, it leads to the nearest pass
+    /// by one of its doors and says to step off:
+    /// "Back along the path, 6 steps. Double tap to step off. Door to Half bath on your left, 1 step."
+    private func railRoute(_ rail: Rail, to target: CGPoint, room goal: Int?, tourStep: Int?) -> String {
+        var s: Double
+        var stepOff: String?
+        let inGoal = { (at: Double) in self.floor.roomIndex(at: rail.point(run: self.railRun, at: at)) == goal }
+        if let exact = tourStep.flatMap({ rail.location(ofTourStep: $0) }), exact.run == railRun {
+            s = exact.s
+        } else if let goal, goal == currentRoom {
+            let spots = [rail.length(of: railRun), 0].compactMap {
+                spotInRoom(rail, from: railPos, toward: $0, room: goal, target: target)
+            }
+            s = spots.min { abs($0 - railPos) < abs($1 - railPos) } ?? railPos
+        } else if let goal, let entry = closestAlongPath(rail, where: inGoal) {
+            let end = entry > railPos ? rail.length(of: railRun) : 0
+            s = spotInRoom(rail, from: entry, toward: end, room: goal, target: target) ?? entry
+        } else if let goal, let hit = doorOffPath(rail, into: goal) {
+            s = hit.s
+            let door = floor.doors[hit.door]
+            let from = door.a == goal ? door.b : door.a
+            stepOff = "\(doorName(door, from: from)) " + sideOfPath(rail, at: s, to: door.point)
+        } else {
+            let close = closestAlongPath(rail) { rail.point(run: self.railRun, at: $0).distance(to: target) <= Self.offPath }
+            s = close ?? rail.project(target, run: railRun, near: railPos)
+            if close == nil { stepOff = "It's " + sideOfPath(rail, at: s, to: target) }
+        }
+        let d = s - railPos
+        let tail = stepOff.map { " Double tap to step off. \($0)." } ?? ""
+        if abs(d) < 1.5 { return (stepOff == nil ? "Right here on the path." : "On the path.") + tail }
+        let rooms = roomsAlong(rail, to: s, skipping: goal)
+        let through = rooms.isEmpty ? "" : " through " + spokenList(rooms)
+        return "\(d > 0 ? "Ahead" : "Back") along the path\(through), \(steps(abs(d)))." + tail
+    }
+
+    static let offPath = 4.0   // ft from the path before a goal counts as off it
+
+    /// Arc lengths along the current run, every half foot, from here to `s`.
+    private func samples(_ rail: Rail, from a: Double, to b: Double) -> [Double] {
+        let n = Int(abs(b - a) / 0.5)
+        guard n > 0 else { return [] }
+        return (1...n).map { a + (b - a) * Double($0) / Double(n) }
+    }
+
+    /// The nearest point, either way along the path, that passes `test`. The
+    /// path doubles back, so the spot nearest in a straight line can be the
+    /// far pass; this one is the fewest steps away.
+    private func closestAlongPath(_ rail: Rail, where test: (Double) -> Bool) -> Double? {
+        let ahead = samples(rail, from: railPos, to: rail.length(of: railRun))
+        let back = samples(rail, from: railPos, to: 0)
+        let candidates = [ahead.first(where: test), back.first(where: test)].compactMap { $0 }
+        return candidates.min { abs($0 - railPos) < abs($1 - railPos) }
+    }
+
+    /// Walking the path from `start` toward `end`, the first spot within 4 ft
+    /// of `target`, as long as the path is still in `room`.
+    private func spotInRoom(_ rail: Rail, from start: Double, toward end: Double, room: Int, target: CGPoint) -> Double? {
+        for s in [start] + samples(rail, from: start, to: end) {
+            let q = rail.point(run: railRun, at: s)
+            guard floor.roomIndex(at: q) == room else { return nil }
+            if q.distance(to: target) <= Self.offPath { return s }
+        }
+        return nil
+    }
+
+    /// For a room the path never enters: the fewest steps along the path to
+    /// within 4 ft of one of its doors. If the path never gets that close, the
+    /// door it comes closest to.
+    private func doorOffPath(_ rail: Rail, into room: Int) -> (door: Int, s: Double)? {
+        let doors = floor.doors.indices.filter { floor.doors[$0].a == room || floor.doors[$0].b == room }
+        let passing = doors.compactMap { i -> (door: Int, s: Double)? in
+            let p = floor.doors[i].point
+            return closestAlongPath(rail) { rail.point(run: self.railRun, at: $0).distance(to: p) <= Self.offPath }
+                .map { (i, $0) }
+        }
+        if let best = passing.min(by: { abs($0.s - railPos) < abs($1.s - railPos) }) { return best }
+        return doors
+            .map { i -> (door: Int, s: Double, gap: Double) in
+                let p = floor.doors[i].point
+                let s = rail.project(p, run: railRun, near: railPos)
+                return (i, s, rail.point(run: railRun, at: s).distance(to: p))
+            }
+            .min { $0.gap < $1.gap }
+            .map { ($0.door, $0.s) }
+    }
+
+    /// Where `target` will be from the path at `s`, facing the way the avatar
+    /// faces there. "on your left, 2 steps".
+    private func sideOfPath(_ rail: Rail, at s: Double, to target: CGPoint) -> String {
+        let t = rail.tangent(run: railRun, at: s)
+        return place(from: rail.point(run: railRun, at: s), to: target, heading: atan2(t.dx, -t.dy))
+    }
+
+    /// The rooms the path walks through between here and `s`, in order, leaving
+    /// out the one you're in and the goal. A room counts after 1 ft of path, so
+    /// clipping a corner of one doesn't name it.
+    private func roomsAlong(_ rail: Rail, to s: Double, skipping goal: Int?) -> [String] {
+        var names: [String] = []
+        var run: (room: Int?, count: Int) = (currentRoom, 0)
+        for at in samples(rail, from: railPos, to: s) {
+            let r = floor.roomIndex(at: rail.point(run: railRun, at: at))
+            run = r == run.room ? (r, run.count + 1) : (r, 1)
+            guard run.count == 2, let r, r != currentRoom, r != goal else { continue }
+            let name = floor.rooms[r].name
+            if !names.contains(name) { names.append(name) }
+        }
+        return names
+    }
+
+    /// "Living room", "Living room and Foyer", "Hall, Kitchen, and Foyer".
+    private func spokenList(_ names: [String]) -> String {
+        let shown = Array(names.prefix(3))
+        let extra = names.count - shown.count
+        var items = shown
+        if extra > 0 { items.append(extra == 1 ? "1 more room" : "\(extra) more rooms") }
+        guard items.count > 1 else { return items.first ?? "" }
+        if items.count == 2 { return items.joined(separator: " and ") }
+        return items.dropLast().joined(separator: ", ") + ", and " + items.last!
     }
 
     /// Switch storeys. On the stairs the avatar keeps its spot (the floors are
