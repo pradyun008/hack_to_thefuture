@@ -35,8 +35,8 @@ nearly the same line — so one spot on the floor can be two places on the route
 tour stops are found by their step number rather than their coordinates, so
 "Jump to room" and "ahead along the path" can't end up facing backwards.
 
-While on the path the tour gives distances along it ("It's ahead along the path,
-about 4 steps") instead of bearings, since a bearing is noise when there is
+While on the path the tour gives distances along it ("Ahead along the path,
+4 steps") instead of bearings, since a bearing is noise when there is
 nowhere to go but forward and back.
 
 The avatar faces the way it last walked, and the trackpad turns with it:
@@ -118,11 +118,25 @@ and fixture names are dropped while it plays, since they'd be stale by the end.
 | Entering a room | Name, size, floor | "Kitchen. 14 by 13 feet. Tile." |
 | Standing in a door | Where it goes | "Door to Kitchen." "Opening to Dining area." "Front door." |
 | Single tap | The room | "Living room." |
-| Double tap | Leaving the path, or rejoining it | "Off the path. Explore freely. Double tap to come back." "Back on the path. Kitchen." |
-| Triple tap | Floor, room, nearest wall, nearest door | "First floor, Kitchen. Near the wall on your left. The opening to Dining area is on your right, about 2 steps." |
-| Find front door button | Way to the front door | "The front door is behind you, about 5 steps. Follow the chime." |
-| Stairs | Direction and how to use them | "Stairs going up. Hold still to climb." |
-| Guided tour | The next stop and how to get there | "Next stop, Kitchen. Go through the door to Kitchen, ahead on your right, about 3 steps." |
+| Double tap | Leaving the path, or rejoining it | "Off the path. Double tap to come back." "Back on the path. Kitchen." |
+| Triple tap | Floor, room, nearest wall, nearest door | "First floor, Kitchen. Wall on your left. Opening to Dining area on your right, 2 steps." |
+| Find front door button | Way to the front door | "Front door behind you, 5 steps. Follow the chime." |
+| Stairs | Direction and how to use them | "Stairs up. Hold still to climb." |
+| Guided tour | The next stop and how to get there | "Next, Kitchen. Ahead along the path, 4 steps." Off the path: "Next, Kitchen. Door ahead right, 3 steps." "Next, Laundry room. Through the door to Family room behind you, 3 steps." |
+
+Spoken lines are kept short because every word costs listening time:
+
+- Lead with the thing, then where: "Front door behind you, 7 steps." No "The
+  front door is", "It's", or "There's".
+- Never repeat what was just said. The tour names the next stop, so a door
+  straight into it is only "Door". "Jump to room" plays the room's narration,
+  which opens with its name, so there's no "Jumped to" line.
+- Step counts are rounded already, so no "about".
+- Eight directions: ahead, ahead left, ahead right, on your left, on your
+  right, back left, back right, behind you.
+- Leave out what isn't known. An unlisted floor type isn't spoken.
+- Controls are taught once, in the tutorial. The tour intro and ending only
+  remind.
 
 Three facts is the whole of "where you are": the room, the nearest wall, and the
 nearest door. Floor type and the front door are left out because a tap cannot

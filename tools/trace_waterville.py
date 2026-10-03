@@ -101,59 +101,62 @@ WALL = {0: [(455, 689, 462, 718)], 1: [(258, 372, 265, 447)]}
 # drawing pixels. Narration avoids left and right; the app gives directions
 # from the walker's heading.
 TOUR = [
-    (0, 507, 895, "You're just inside the front door, in the foyer. The foyer is about 14 by 10 feet. "
-                  "The stairs to the second floor are close by, and the living room opens off the foyer "
-                  "with no wall between them."),
+    (0, 507, 895, "Foyer, just inside the front door. 14 by 10 feet. The stairs up are "
+                  "close by, and the living room opens off the foyer with no wall "
+                  "between."),
     (0, 560, 860, None),
-    (0, 680, 850, "Living room. About 11 by 14 feet. The ceiling is open all the way to the second floor. "
-                  "Windows face the street along the front wall. The dining area is straight through, "
-                  "past two columns."),
+    (0, 680, 850, "Living room. 11 by 14 feet, with a two story ceiling. Windows on the "
+                  "front wall face the street. The dining area is straight through, past "
+                  "two columns."),
     (0, 685, 760, None),
-    (0, 685, 640, "Dining area. About 13 by 11 feet, with a bay bumped out of the side wall. "
-                  "A wide opening leads into the kitchen."),
+    (0, 685, 640, "Dining area. 13 by 11 feet, with a bay in the side wall. A wide "
+                  "opening leads into the kitchen."),
     (0, 640, 662, None),
-    (0, 545, 662, "Kitchen. About 9 by 13 feet, with an island in the middle and the sink under the "
+    (0, 545, 662, "Kitchen. 9 by 13 feet. An island in the middle, and the sink under the "
                   "back window."),
-    (0, 420, 640, "Breakfast nook. About 12 by 13 feet. A sliding door in the back wall leads to the yard. "
-                  "There's no wall between the nook and the family room."),
-    (0, 200, 650, "Family room. About 16 by 17 feet, with a fireplace in the far end wall."),
+    (0, 420, 640, "Breakfast nook. 12 by 13 feet. A sliding door in the back wall leads "
+                  "to the yard. No wall between the nook and the family room."),
+    (0, 200, 650, "Family room. 16 by 17 feet, fireplace in the far end wall."),
     (0, 322, 660, None),
-    (0, 322, 750, "Laundry room, about 7 by 8 feet. A door in the far wall goes out to the garage."),
+    (0, 322, 750, "Laundry room, 7 by 8 feet. A door in the far wall goes out to the "
+                  "garage."),
     (0, 322, 845, None),
-    (0, 220, 950, "Garage. A two car garage, about 23 by 18 feet, concrete. The big garage door is in "
+    (0, 220, 950, "Garage. Two car, 23 by 18 feet, concrete. The big garage door is in "
                   "the front wall."),
     (0, 322, 845, None),
     (0, 322, 660, None),
     (0, 430, 665, None),
-    (0, 430, 850, "Back in the foyer, by the front door. The half bath is here, through a small door. "
-                  "The short hall you just walked links the foyer to the kitchen."),
+    (0, 430, 850, "Foyer again, by the front door. The half bath is through the small "
+                  "door here. The short hall you just walked joins the foyer to the "
+                  "kitchen."),
     (0, 520, 850, None),
-    (0, 574, 842, "Stairs to the second floor. They climb toward the back of the house, then turn."),
+    (0, 574, 842, "Stairs to the second floor. They climb toward the back of the house, "
+                  "then turn."),
     (0, 574, 795, "climb"),
     (1, 574, 255, None),
     (1, 520, 250, None),
-    (1, 400, 250, "Top of the stairs. Upstairs hall. Every bedroom and the hall bath open off this hall."),
+    (1, 400, 250, "Top of the stairs, upstairs hall. Every bedroom and the hall bath open "
+                  "off it."),
     (1, 400, 205, None),
     (1, 440, 205, None),
-    (1, 500, 130, "Bedroom 2. About 18 by 13 feet, with a closet, and a door to the attic in the far wall."),
+    (1, 500, 130, "Bedroom 2. 18 by 13 feet, with a closet, and a door to the attic in "
+                  "the far wall."),
     (1, 440, 205, None),
     (1, 400, 205, None),
     (1, 400, 250, None),
     (1, 350, 250, None),
-    (1, 350, 195, "Hall bath, about 8 by 7 feet, with a tub."),
+    (1, 350, 195, "Hall bath, 8 by 7 feet, with a tub."),
     (1, 350, 250, None),
     (1, 250, 250, None),
-    (1, 180, 260, "Primary bedroom. About 16 by 14 feet, with windows on two walls. The primary bath is "
-                  "through a door in the back wall."),
+    (1, 180, 260, "Primary bedroom. 16 by 14 feet, windows on two walls. The primary bath "
+                  "is through a door in the back wall."),
     (1, 182, 175, None),
-    (1, 182, 110, "Primary bath, about 11 by 8 feet, with a corner tub and two sinks. A walk-in closet "
-                  "opens off one side and the shower room off the other."),
+    (1, 182, 110, "Primary bath, 11 by 8 feet. Corner tub and two sinks. A walk-in closet "
+                  "opens off one side, the shower room off the other."),
     (1, 182, 175, None),
     (1, 250, 250, None),
     (1, 320, 250, None),
-    (1, 320, 330, "Bedroom 3. About 12 by 11 feet, at the front of the house. "
-                  "That's the end of the tour. Explore on your own. Two finger tap asks where you are, "
-                  "and a triple tap points you to the front door."),
+    (1, 320, 330, "Bedroom 3. 12 by 11 feet, at the front of the house."),
 ]
 
 

@@ -71,15 +71,16 @@ final class GuidedTour {
 
     /// `preface` is said first, as part of the same narration so nothing cuts it off.
     func start(preface: String? = nil) {
-        let intro = "Guided tour. You walk it yourself: drag to move, and you'll hear where to go next. Single tap repeats the directions."
+        let intro = "Guided tour. Drag to walk to each stop. Single tap repeats directions."
         jump(to: 0, intro: [preface, intro].compactMap { $0 }.joined(separator: " "))
     }
 
     func restart() {
-        jump(to: 0, intro: "Restarting the tour.")
+        jump(to: 0, intro: "Restarting tour.")
     }
 
-    /// Puts the avatar at a checkpoint and narrates it right away.
+    /// Puts the avatar at a checkpoint and narrates it right away. The
+    /// narration opens with the room's name, so there's no "Jumped to" line.
     func jump(to index: Int, intro: String? = nil) {
         guard checkpoints.indices.contains(index) else { return }
         begin()
@@ -87,7 +88,7 @@ final class GuidedTour {
         explorer.teleport(to: cp.point, floor: cp.floor, heading: cp.heading, tourStep: cp.step)
         lastFloor = cp.floor
         target = index
-        arrive(intro: intro ?? "Jumped to \(cp.name).")
+        arrive(intro: intro)
     }
 
     /// Aims back at the stop before the one you last reached, and guides you
@@ -97,8 +98,7 @@ final class GuidedTour {
         restartRun()
         target = max((reached ?? target) - 1, 0)
         reached = nil
-        let back = "Going back to \(checkpoints[target].name)."
-        if isAtTarget() { arrive(intro: back) } else { guide(prefix: back + " ") }
+        if isAtTarget() { arrive(intro: "Previous stop.") } else { guide(lead: "Returning to ") }
     }
 
     func stop(silently: Bool = false) {
@@ -109,7 +109,7 @@ final class GuidedTour {
         timer?.invalidate()
         timer = nil
         speech.stop()
-        if !silently { speech.say("Tour stopped. Explore on your own.", interrupt: true) }
+        if !silently { speech.say("Tour stopped.", interrupt: true) }
     }
 
     /// Single tap during the tour: the room you're in and the way to the next stop.
@@ -196,8 +196,8 @@ final class GuidedTour {
 
     // MARK: Directions
 
-    private func guide(prefix: String = "") {
-        speech.say(prefix + guidance())
+    private func guide(lead: String = "Next, ") {
+        speech.say(guidance(lead: lead))
         noteGuidance()
     }
 
@@ -207,22 +207,22 @@ final class GuidedTour {
         lastFloor = explorer.floorIndex
     }
 
-    /// "Next stop, Kitchen. Go through the door to Kitchen, on your left, about 3 steps."
+    /// "Next, Kitchen. Door on your left, 3 steps."
     /// On the wrong floor, it leads to the stairs instead.
-    private func guidance() -> String {
+    private func guidance(lead: String = "Next, ") -> String {
         let cp = checkpoints[target]
-        var text = "Next stop, \(cp.name)."
+        var text = lead + cp.name
         guard explorer.floorIndex == cp.floor else {
             let up = cp.floor > explorer.floorIndex
-            text += up ? " It's upstairs." : " It's downstairs."
+            text += ", \(explorer.house.floors[cp.floor].name.lowercased())."
             if explorer.isOnStairs {
                 text += up ? " Hold still on the stairs to climb." : " Hold still on the stairs to go down."
             } else if let s = explorer.floor.stairsIndex {
-                text += " Head for the stairs. " + explorer.route(to: stairsSpot(s), room: s)
+                text += " " + explorer.route(to: stairsSpot(s), room: s, name: "Stairs")
             }
             return text
         }
-        return text + " " + explorer.route(to: cp.point, room: cp.room, tourStep: cp.step)
+        return text + ". " + explorer.route(to: cp.point, room: cp.room, tourStep: cp.step)
     }
 
     /// Where on this floor's stairs to aim for: the part that connects floors.
@@ -242,7 +242,7 @@ final class GuidedTour {
         running = false
         timer?.invalidate()
         timer = nil
-        speech.say("That's the end of the tour. Explore on your own. You're still on the path: double tap to step off it and back on, and triple tap to hear where you are.")
+        speech.say("End of the tour. You're still on the path. Double tap to step off or back on, triple tap for where you are.")
         onFinish?()
     }
 }

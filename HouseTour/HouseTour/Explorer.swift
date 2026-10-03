@@ -171,7 +171,7 @@ final class Explorer: ObservableObject {
         guard let rail else { return }
         if onRail {
             onRail = false
-            speech.request("Off the path. Explore freely. Double tap to come back.")
+            speech.request("Off the path. Double tap to come back.")
             return
         }
         guard let run = rail.run(onFloor: floorIndex) else {
@@ -250,7 +250,7 @@ final class Explorer: ObservableObject {
     /// middle of walking, and a tap can't cut speech off, so every extra clause
     /// is time the user is stuck waiting. The floor type is still given on the
     /// way into a room, where it isn't competing with anything.
-    /// "First floor, Kitchen. Near the wall on your left. The opening to Dining area is on your right, about 2 steps."
+    /// "First floor, Kitchen. Wall on your left. Opening to Dining area on your right, 2 steps."
     func whereAmI() {
         let p = position
         guard let room = currentRoom else {
@@ -260,7 +260,7 @@ final class Explorer: ObservableObject {
         var parts = ["\(floor.name), \(floor.rooms[room].name)", wallHint(p, in: floor.rooms[room].rect)]
         if let i = nearbyDoors(p).first {
             let spot = floor.nearestPoint(onDoor: i, from: p)
-            parts.append("\(theDoor(floor.doors[i])) is \(place(from: p, to: spot, heading: heading))")
+            parts.append("\(doorName(floor.doors[i], from: currentRoom)) \(place(from: p, to: spot, heading: heading))")
         }
         speech.request(parts.joined(separator: ". ") + ".")
     }
@@ -282,8 +282,11 @@ final class Explorer: ObservableObject {
 
     /// How to get to `target` in room `room` on this floor: through the first
     /// door on the way when it's in another room, otherwise straight there.
-    /// "Go through the door to Kitchen, on your left, about 3 steps."
-    func route(to target: CGPoint, room: Int?, tourStep: Int? = nil) -> String {
+    /// `name` is the goal's name when the caller hasn't just said it. When it
+    /// has, a door straight into the goal is only "Door": "Door on your left,
+    /// 3 steps." A door to somewhere else starts with "Through" so its room
+    /// isn't heard as the goal: "Through the door to Hall ahead, 4 steps."
+    func route(to target: CGPoint, room: Int?, tourStep: Int? = nil, name: String? = nil) -> String {
         let p = position
         // On the rail there's nowhere to go but along it, so a bearing would be
         // noise: how far, and which way round, is the whole answer.
@@ -291,15 +294,21 @@ final class Explorer: ObservableObject {
             let exact = tourStep.flatMap { rail.location(ofTourStep: $0) }
             let s = exact?.run == railRun ? exact!.s : rail.project(target, run: railRun, near: railPos)
             let d = s - railPos
-            if abs(d) < 1.5 { return "It's right here on the path." }
-            return "It's \(d > 0 ? "ahead" : "back") along the path, about \(steps(abs(d)))."
+            if abs(d) < 1.5 { return "Right here on the path." }
+            return "\(d > 0 ? "Ahead" : "Back") along the path, \(steps(abs(d)))."
         }
         if let here = currentRoom ?? lastLabel, let goal = room, let i = floor.firstDoor(from: here, to: goal) {
             let spot = floor.nearestPoint(onDoor: i, from: p)
-            let door = theDoor(floor.doors[i], from: here)
-            return "Go through \(door.prefix(1).lowercased() + door.dropFirst()), \(place(from: p, to: spot, heading: heading))."
+            let door = floor.doors[i]
+            let intoGoal = name == nil && door.name == nil && (door.a == goal || door.b == goal)
+            let other = doorName(door, from: here)
+            let label = intoGoal ? (door.kind == "opening" ? "Opening" : "Door")
+                : name == nil ? "Through the " + other.prefix(1).lowercased() + other.dropFirst() : other
+            return "\(label) \(place(from: p, to: spot, heading: heading))."
         }
-        return "It's \(place(from: p, to: target, heading: heading))."
+        let there = place(from: p, to: target, heading: heading)
+        if let name { return "\(name) \(there)." }
+        return there.prefix(1).uppercased() + there.dropFirst() + "."
     }
 
     /// Switch storeys. On the stairs the avatar keeps its spot (the floors are
@@ -335,7 +344,7 @@ final class Explorer: ObservableObject {
         updateBeacon()
         var text = floor.name + "."
         if let room = currentRoom, floor.rooms[room].isStairs {
-            text += " You're on the stairs."
+            text += " On the stairs."
         } else {
             text += " " + roomSentence(currentRoom)
         }
@@ -543,7 +552,7 @@ final class Explorer: ObservableObject {
             } else {
                 // This part of the stairs isn't drawn on the other floor. Point to the part that is.
                 stairsHold = (Date.distantFuture, p)
-                speech.say("Keep following the stairs. " + stairsGuide(from: p), interrupt: true)
+                speech.say("Not here. " + stairsGuide(from: p), interrupt: true)
             }
         } else {
             stairsHold = (Date(), p)
@@ -588,7 +597,7 @@ final class Explorer: ObservableObject {
         guard let room else { return "Outside the house." }
         let r = floor.rooms[room]
         if r.isStairs {
-            let base = floorIndex == 0 ? "Stairs going up." : "Stairs going down."
+            let base = floorIndex == 0 ? "Stairs up." : "Stairs down."
             guard !house.stairsConnect(at: position) else {
                 return base + (floorIndex == 0 ? " Hold still to climb." : " Hold still to go down.")
             }
@@ -597,11 +606,11 @@ final class Explorer: ObservableObject {
         return r.entrySentence
     }
 
-    /// "Follow them on your left, about 3 steps, then hold still."
+    /// "Follow the stairs on your left, 3 steps, then hold still."
     private func stairsGuide(from p: CGPoint) -> String {
         guard let target = house.stairLanding else { return "Hold still to change floors." }
         guard p.distance(to: target) >= 1.5 else { return "Hold still right here." }
-        return "Follow them \(place(from: p, to: target, heading: heading)), then hold still."
+        return "Follow the stairs \(place(from: p, to: target, heading: heading)), then hold still."
     }
 
     private func blockedName(_ k: CellKind) -> String {
@@ -610,7 +619,7 @@ final class Explorer: ObservableObject {
         case .window: "Window"
         case .screen: "Porch screen"
         case .railing: "Railing"
-        case .void: "Railing. Open to the floor below"
+        case .void: "Railing, open below"
         case .open: ""
         }
     }
@@ -622,12 +631,6 @@ final class Explorer: ObservableObject {
         let other = door.a == here ? door.b : door.a
         let otherName = other >= 0 ? floor.rooms[other].name : "outside"
         return "\(door.kind == "opening" ? "Opening" : "Door") to \(otherName)"
-    }
-
-    /// "The door to Kitchen", "The garage side door".
-    private func theDoor(_ door: Door, from here: Int? = nil) -> String {
-        let name = doorName(door, from: here ?? currentRoom)
-        return "The " + name.prefix(1).lowercased() + name.dropFirst()
     }
 
     /// The doors out of the room you're in, nearest first: the closest one, plus
@@ -649,28 +652,29 @@ final class Explorer: ObservableObject {
         return [first]
     }
 
-    /// Always names the front door, never just "the door".
+    /// Always names the front door, never just "the door". Off its floor it
+    /// also points to the stairs.
     private func frontDoorHint(from p: CGPoint) -> String {
         let door = house.frontDoor
         guard floorIndex == door.floor else {
             let side = floorIndex > door.floor ? "downstairs" : "upstairs"
-            if isOnStairs { return "The front door is \(side). You're on the stairs" }
-            guard let s = floor.stairsIndex else { return "The front door is \(side)" }
+            if isOnStairs { return "Front door \(side). You're on the stairs" }
+            guard let s = floor.stairsIndex else { return "Front door \(side)" }
             let r = floor.rooms[s].rect
             let c = CGPoint(x: r.midX, y: r.midY)
-            return "The front door is \(side). The stairs are \(place(from: p, to: c, heading: heading))"
+            return "Front door \(side). Stairs \(place(from: p, to: c, heading: heading))"
         }
-        return "The front door is \(place(from: p, to: door.point, heading: heading))"
+        return "Front door \(place(from: p, to: door.point, heading: heading))"
     }
 
-    /// "Near the wall on your left", turned to the way you're facing.
+    /// "Wall on your left", turned to the way you're facing.
     private func wallHint(_ p: CGPoint, in r: CGRect) -> String {
         let walls = [
             CGPoint(x: p.x, y: r.minY), CGPoint(x: p.x, y: r.maxY),
             CGPoint(x: r.minX, y: p.y), CGPoint(x: r.maxX, y: p.y),
         ]
         let nearest = walls.min { p.distance(to: $0) < p.distance(to: $1) }!
-        guard p.distance(to: nearest) < 2.5 else { return "In the middle of the room" }
-        return "Near the wall " + relativeSide(from: p, to: nearest, heading: heading)
+        guard p.distance(to: nearest) < 2.5 else { return "Middle of the room" }
+        return "Wall " + relativeSide(from: p, to: nearest, heading: heading)
     }
 }

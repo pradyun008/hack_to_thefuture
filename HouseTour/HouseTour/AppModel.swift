@@ -150,7 +150,7 @@ final class AppModel: ObservableObject {
     /// doorway easy to line up with.
     func announceFineMovement(_ on: Bool) {
         interrupt()
-        speech.request(on ? "Fine movement. Each swipe moves a third as far." : "Normal movement.")
+        speech.request(on ? "Fine movement. Swipes go a third as far." : "Normal movement.")
     }
 
     func findFrontDoor() {
