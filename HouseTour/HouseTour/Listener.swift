@@ -12,6 +12,11 @@ final class Listener {
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var heard = ""
+    /// For the transcript: each different guess the recognizer made while
+    /// listening, and how the last question ended ("final", "timed out", or
+    /// the error). Reset on every start.
+    private(set) var guesses: [String] = []
+    private(set) var ending = ""
     private var done: ((String) -> Void)?
     private var recording = false
     private var run = 0   // bumps on each start so a stale timeout can't end a newer question
@@ -71,12 +76,21 @@ final class Listener {
         }
         run += 1
         heard = ""
+        guesses = []
+        ending = ""
         self.request = request
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
             DispatchQueue.main.async {
                 guard let self, self.request === request else { return }
-                if let result { self.heard = result.bestTranscription.formattedString }
-                if result?.isFinal == true || error != nil { self.deliver() }
+                if let result {
+                    self.heard = result.bestTranscription.formattedString
+                    if !self.heard.isEmpty, self.guesses.last != self.heard { self.guesses.append(self.heard) }
+                }
+                if result?.isFinal == true {
+                    self.deliver(ending: "final")
+                } else if let error {
+                    self.deliver(ending: "error: \(error.localizedDescription)")
+                }
             }
         }
         return true
@@ -93,7 +107,7 @@ final class Listener {
         let current = run
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard self?.run == current else { return }
-            self?.deliver()
+            self?.deliver(ending: "timed out")
         }
     }
 
@@ -106,9 +120,10 @@ final class Listener {
         stopRecording()
     }
 
-    private func deliver() {
+    private func deliver(ending: String) {
         guard let done else { return }
         self.done = nil
+        self.ending = ending
         task?.cancel()
         task = nil
         request = nil

@@ -70,9 +70,16 @@ final class GuidedTour {
     // MARK: Controls
 
     /// `preface` is said first, as part of the same narration so nothing cuts it off.
+    /// The tour is walked on the path, so it puts you back on it, and says so
+    /// when starting moves you.
     func start(preface: String? = nil) {
         let intro = "Guided tour. Hold and push up to walk to each stop. Single tap repeats directions."
-        jump(to: 0, intro: [preface, intro].compactMap { $0 }.joined(separator: " "))
+        let moved = checkpoints.first.map {
+            $0.floor != explorer.floorIndex || explorer.position.distance(to: $0.point) > Self.reach
+        } ?? false
+        explorer.boardRail()
+        let back = moved ? "Back to the start of the tour." : nil
+        jump(to: 0, intro: [preface, back, intro].compactMap { $0 }.joined(separator: " "))
     }
 
     /// Puts the avatar at a checkpoint and narrates it right away.
@@ -100,7 +107,8 @@ final class GuidedTour {
     /// Single tap during the tour: the room you're in and the way to the next stop.
     func repeatGuidance() {
         guard running, !narrating, target < checkpoints.count else { return }
-        if speech.request(explorer.roomLabel + ". " + guidance()) { noteGuidance() }
+        speech.say(explorer.roomLabel + ". " + guidance(), interrupt: true)
+        noteGuidance()
     }
 
     // MARK: Walking
@@ -153,9 +161,16 @@ final class GuidedTour {
         guard explorer.floorIndex == cp.floor else { return false }
         if explorer.position.distance(to: cp.point) <= Self.reach { return true }
         if cp.stairs { return explorer.isOnStairs }
-        // Walking into the stop's room counts, unless the stop before was in the same room.
         guard let room = cp.room, explorer.currentRoom == room else { return false }
-        return target == 0 || checkpoints[target - 1].room != room || checkpoints[target - 1].floor != cp.floor
+        return arrivesOnEntry(target)
+    }
+
+    /// Walking into the stop's room counts as reaching it, unless the stop
+    /// before was in the same room.
+    private func arrivesOnEntry(_ i: Int) -> Bool {
+        let cp = checkpoints[i]
+        guard !cp.stairs, let room = cp.room else { return false }
+        return i == 0 || checkpoints[i - 1].room != room || checkpoints[i - 1].floor != cp.floor
     }
 
     /// Plays the stop's narration, then points to the next one. Narration is
@@ -192,7 +207,7 @@ final class GuidedTour {
         lastFloor = explorer.floorIndex
     }
 
-    /// "Next, Kitchen. Door on your left, 3 steps."
+    /// "Next, Kitchen. Door, turn 90 degrees left, 3 steps."
     /// On the wrong floor, it leads to the stairs instead.
     private func guidance(lead: String = "Next, ") -> String {
         let cp = checkpoints[target]
@@ -207,7 +222,8 @@ final class GuidedTour {
             }
             return text
         }
-        return text + ". " + explorer.route(to: cp.point, room: cp.room, tourStep: cp.step)
+        return text + ". " + explorer.route(to: cp.point, room: cp.room, tourStep: cp.step,
+                                            arrivesOnEntry: arrivesOnEntry(target))
     }
 
     /// Where on this floor's stairs to aim for: the part that connects floors.

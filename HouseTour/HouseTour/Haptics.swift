@@ -75,6 +75,17 @@ final class Haptics {
     /// Tap, tap, pause, tap.
     func frontDoor() { play([tap(0, 0.85, 0.8), tap(0.13, 0.85, 0.8), tap(0.45, 1.0, 0.8)]) }
 
+    /// Three quick light ticks: you're facing where the guide pointed.
+    func facing() { play([tap(0, 0.5, 1.0), tap(0.05, 0.5, 1.0), tap(0.1, 0.5, 1.0)]) }
+
+    /// Stepping onto the path: a swell that ends in a snap, like clicking onto
+    /// a track. Off is the reverse, a snap that fades. Longer than anything
+    /// else here, so it can't pass for a door or a bump.
+    func path(on: Bool) {
+        play(on ? [buzz(0, 0.25, 0.7, 0.3, attack: 0.2), tap(0.27, 0.8, 0.9)]
+                : [tap(0, 0.8, 0.9), buzz(0.03, 0.25, 0.7, 0.3, release: 0.2)])
+    }
+
     /// Soft, dull bump for built-ins you can walk around.
     func fixture() { play([buzz(0, 0.12, 0.6, 0.1, attack: 0.03, release: 0.06)]) }
 

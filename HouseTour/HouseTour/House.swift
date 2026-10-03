@@ -222,6 +222,33 @@ final class Floor {
         }
         return nil
     }
+
+    /// The shortest walk from `p` in room `start` to `end` in room `goal`: the
+    /// doors to go through in order, and its length in feet, door to door in
+    /// straight lines. Nil when the rooms aren't connected on this floor.
+    func walk(from p: CGPoint, in start: Int, to goal: Int, end: CGPoint) -> (doors: [Int], feet: Double)? {
+        guard start != goal else { return ([], p.distance(to: end)) }
+        // A state is a door just walked through, and the room it led into.
+        struct State { let door: Int, room: Int, feet: Double, path: [Int] }
+        var open: [State] = []
+        for (i, d) in doors.enumerated() where d.a == start || d.b == start {
+            let next = d.a == start ? d.b : d.a
+            if next >= 0 { open.append(State(door: i, room: next, feet: p.distance(to: nearestPoint(onDoor: i, from: p)), path: [i])) }
+        }
+        var settled = Set<Int>()   // door * rooms.count + room
+        while let k = open.indices.min(by: { open[$0].feet < open[$1].feet }) {
+            let s = open.remove(at: k)
+            guard settled.insert(s.door * rooms.count + s.room).inserted else { continue }
+            let here = doors[s.door].point
+            if s.room == goal { return (s.path, s.feet + here.distance(to: end)) }
+            for (i, d) in doors.enumerated() where i != s.door && (d.a == s.room || d.b == s.room) {
+                let next = d.a == s.room ? d.b : d.a
+                guard next >= 0, !settled.contains(i * rooms.count + next) else { continue }
+                open.append(State(door: i, room: next, feet: s.feet + here.distance(to: d.point), path: s.path + [i]))
+            }
+        }
+        return nil
+    }
 }
 
 struct RawFloor: Decodable {
@@ -375,18 +402,35 @@ func relativeSide(from: CGPoint, to target: CGPoint, heading: Double) -> String 
     }
 }
 
-/// Where `target` is relative to someone at `from` facing `heading`, the way
-/// they last walked. Ahead turns with the walker, so "ahead" is always the
-/// direction they were going, not the top of the screen.
-func relativeDirection(from: CGPoint, to target: CGPoint, heading: Double) -> String {
-    from.distance(to: target) < 1.5 ? "right here" : relativeSide(from: from, to: target, heading: heading)
+/// Degrees to turn to face `target`, from -180 (left) to 180 (right). 0 is
+/// straight ahead.
+func turnAngle(from: CGPoint, to target: CGPoint, heading: Double) -> Double {
+    let turn = bearing(from: from, to: target) - heading
+    return atan2(sin(turn), cos(turn)) * 180 / .pi
 }
 
-/// "on your left, 3 steps", or "right here" when it's within reach. Step
-/// counts are rounded, so "about" would only add a word.
-func place(from: CGPoint, to target: CGPoint, heading: Double) -> String {
-    let side = relativeDirection(from: from, to: target, heading: heading)
-    return side == "right here" ? side : "\(side), \(steps(from.distance(to: target)))"
+/// How far to turn to face `target`, to the nearest 45 degrees: "straight
+/// ahead", "turn 45 degrees right", "turn 90 degrees left", "turn 180 degrees".
+/// Testers couldn't tell how far "on your right" meant.
+func turnPhrase(from: CGPoint, to target: CGPoint, heading: Double) -> String {
+    let angle = turnAngle(from: from, to: target, heading: heading)
+    let degrees = Int((abs(angle) / 45).rounded()) * 45
+    switch degrees {
+    case 0: return "straight ahead"
+    case 180: return "turn 180 degrees"
+    default: return "turn \(degrees) degrees \(angle > 0 ? "right" : "left")"
+    }
+}
+
+/// "turn 45 degrees right, 3 steps", or "right here" when it's within reach.
+/// Step counts are rounded, so "about" would only add a word. `turns: false`
+/// says where it is instead ("on your left, 3 steps"), for the path, where
+/// turning doesn't change which way you walk.
+func place(from: CGPoint, to target: CGPoint, heading: Double, turns: Bool = true) -> String {
+    guard from.distance(to: target) >= 1.5 else { return "right here" }
+    let way = turns ? turnPhrase(from: from, to: target, heading: heading)
+        : relativeSide(from: from, to: target, heading: heading)
+    return "\(way), \(steps(from.distance(to: target)))"
 }
 
 /// Feet to footsteps, using a 2.5 ft stride.

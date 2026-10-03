@@ -11,6 +11,7 @@ final class SpatialAudio {
     private let wind = AVAudioPlayerNode()
     private let effects = AVAudioPlayerNode()
     private let warning = AVAudioPlayerNode()
+    private let turn = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
 
     private lazy var warningBuffer = Synth.buffer(format, seconds: 0.12) { _, t in
@@ -19,6 +20,7 @@ final class SpatialAudio {
     }
 
     private lazy var beaconLoop = Synth.beaconLoop(format)
+    private lazy var turnTickBuffer = Synth.tick(format)
     private lazy var chimeBuffer = Synth.chime(format, gain: 0.8)
     private lazy var windLoop = Synth.wind(format)
     private lazy var micOn = Synth.cue(format, rising: true)
@@ -32,12 +34,13 @@ final class SpatialAudio {
         try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? session.setActive(true)
 
-        [environment, beacon, wind, effects, warning].forEach(engine.attach)
+        [environment, beacon, wind, effects, warning, turn].forEach(engine.attach)
         engine.connect(environment, to: engine.mainMixerNode, format: nil)
         engine.connect(beacon, to: environment, format: format)
         engine.connect(wind, to: engine.mainMixerNode, format: format)
         engine.connect(effects, to: engine.mainMixerNode, format: format)
         engine.connect(warning, to: engine.mainMixerNode, format: format)
+        engine.connect(turn, to: engine.mainMixerNode, format: format)
 
         beacon.renderingAlgorithm = .HRTFHQ
         beacon.sourceMode = .pointSource
@@ -50,6 +53,7 @@ final class SpatialAudio {
         beacon.position = AVAudio3DPoint(x: Float(frontDoor.x), y: 0, z: Float(frontDoor.y))
         beacon.volume = 0.55
         wind.volume = 0.22
+        turn.volume = 0.35
 
         let center = NotificationCenter.default
         center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
@@ -129,6 +133,15 @@ final class SpatialAudio {
         warning.play()
     }
 
+    /// A soft tick in one ear only: the side to turn toward. Panned, not
+    /// spatial, so it can't be heard as coming from somewhere in the house.
+    func turnTick(right: Bool) {
+        guard start() else { return }
+        turn.pan = right ? 1 : -1
+        turn.scheduleBuffer(turnTickBuffer, at: nil, options: .interrupts)
+        turn.play()
+    }
+
     /// Front door chime, played in the head (not spatial).
     func chime() {
         guard start() else { return }
@@ -180,6 +193,14 @@ enum Synth {
             }
             return Float(note(0, 1318.5) + note(0.16, 1046.5))
         }, peak: 0.7)
+    }
+
+    /// A short, low wooden tick, quieter and duller than anything else, so it
+    /// can repeat under speech without getting in the way.
+    static func tick(_ f: AVAudioFormat) -> AVAudioPCMBuffer {
+        normalize(buffer(f, seconds: 0.06) { _, t in
+            Float(min(t / 0.002, 1) * exp(-t / 0.012) * sin(2 * .pi * 740 * t))
+        }, peak: 0.5)
     }
 
     /// Two short notes a fifth apart, 0.2 s in all.

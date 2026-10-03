@@ -15,7 +15,10 @@ final class AppModel: ObservableObject {
     let audio: SpatialAudio
     private(set) var explorer: Explorer
     private var tour: GuidedTour
+    private var guide: Guide
     private let viewer = LaptopViewer()
+    /// What the user asked and tapped and what the app said, for testing.
+    let transcript = Transcript()
 #if DEBUG && targetEnvironment(simulator)
     private let simulatorMotion = SimulatorMotionBridge()
 #endif
@@ -43,6 +46,7 @@ final class AppModel: ObservableObject {
         self.audio = audio
         self.explorer = explorer
         tour = GuidedTour(explorer: explorer, speech: speech)
+        guide = Guide(explorer: explorer, speech: speech, haptics: haptics, audio: audio)
         connectHouse(demo)
         connectViewer()
         headMotion.onHeading = { [weak self] heading in self?.explorer.faceHead(heading) }
@@ -61,7 +65,14 @@ final class AppModel: ObservableObject {
             self?.tourRunning = false
             UserDefaults.standard.set(true, forKey: Self.didTourKey)
         }
-        explorer.onUpdate = { [weak self] in self?.tour.update() }
+        explorer.onUpdate = { [weak self] in
+            self?.tour.update()
+            self?.guide.update()
+        }
+        explorer.onEvent = { [weak self] text in self?.log(text, who: "event") }
+        explorer.$onRail.dropFirst().removeDuplicates()
+            .sink { [weak self] on in self?.log(on ? "Path on" : "Path off", who: "event") }
+            .store(in: &houseBag)
         // Re-render SwiftUI when the explorer's room or floor changes.
         explorer.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &houseBag)
         // Mirror position, heading, room, and floor to the laptop viewer.
@@ -69,15 +80,18 @@ final class AppModel: ObservableObject {
         viewer.show(demo)
         explorer.$position.sink { p in viewer.update { $0.x = p.x; $0.y = p.y } }.store(in: &houseBag)
         explorer.$heading.sink { h in viewer.update { $0.heading = h } }.store(in: &houseBag)
+        explorer.$heading.sink { [weak self] h in self?.guide.headingChanged(to: h) }.store(in: &houseBag)
         explorer.$floorIndex.sink { f in viewer.update { $0.floor = f } }.store(in: &houseBag)
         explorer.$roomName.sink { name in viewer.update { $0.room = name } }.store(in: &houseBag)
         explorer.$onRail.sink { on in viewer.update { $0.onRail = on } }.store(in: &houseBag)
     }
 
     /// Swaps in another bundled house and names it. You start in free roam at
-    /// its front door; the guided tour waits for its button.
+    /// its front door; the guided tour waits to be asked for.
     func switchHouse(to demo: DemoHouse) {
+        log("Switched house to \(demo.title)")
         stopTutorial()
+        guide.stop(silently: true)
         if tourRunning {
             tour.stop(silently: true)
             tourRunning = false
@@ -89,6 +103,7 @@ final class AppModel: ObservableObject {
         explorer = Explorer(house: house, haptics: haptics, audio: audio, speech: speech, onRail: false)
         if let headHeading { explorer.faceHead(headHeading) }
         tour = GuidedTour(explorer: explorer, speech: speech)
+        guide = Guide(explorer: explorer, speech: speech, haptics: haptics, audio: audio)
         connectHouse(demo)
         speech.request("\(house.address). \(house.summary)")
     }
@@ -98,7 +113,10 @@ final class AppModel: ObservableObject {
     private func connectViewer() {
         let viewer = self.viewer
         $tourRunning.sink { on in viewer.update { $0.touring = on } }.store(in: &bag)
-        speech.onSay = { text in
+        viewer.transcript = transcript
+        speech.onSkip = { [weak self] text in self?.log(text, who: "skipped") }
+        speech.onSay = { [weak self] text in
+            self?.log(text, who: "app")
             viewer.update {
                 $0.said = text
                 $0.saidAt = Date().timeIntervalSince1970
@@ -131,12 +149,13 @@ final class AppModel: ObservableObject {
     }
 
     /// First launch: the haptic tutorial. Every launch starts in free roam; the
-    /// guided tour waits for its button.
+    /// guided tour waits to be asked for ("start the tour").
     func firstLaunch(tutorial: Bool) {
         if tutorial { runTutorial() }
     }
 
     func toggleTour() {
+        log(tourRunning ? "Stopped the tour" : "Started the tour")
         if tourRunning {
             tour.stop()
             tourRunning = false
@@ -147,21 +166,33 @@ final class AppModel: ObservableObject {
 
     private func startTour(preface: String? = nil) {
         stopTutorial()
-        // The tour walks the route, so it starts by putting you on it.
-        if !explorer.onRail { explorer.toggleRail() }
+        let guiding = guide.running
+        guide.stop(silently: true)
         tourRunning = true
-        tour.start(preface: preface)
+        let parts = [guiding ? "Guide stopped." : nil, preface].compactMap { $0 }
+        tour.start(preface: parts.isEmpty ? nil : parts.joined(separator: " "))
     }
 
-    /// Single tap: during the tour, the way to the next stop; otherwise the room.
+    /// Single tap: while guiding, the next leg; during the tour, the way to the
+    /// next stop; otherwise the room.
     func singleTap() {
+        log("Single tap")
+        if guide.running { return guide.repeatLeg() }
         tourRunning ? tour.repeatGuidance() : explorer.announceLocation()
     }
 
     /// Triple tap on the touch surface: leave the fixed route, or snap back to it.
     func toggleRail() {
+        log("Triple tap")
         interrupt()
         explorer.toggleRail()
+        // Off the path you steer yourself, so say which way, after "Off the path".
+        if guide.running, !explorer.onRail { guide.repeatLeg(interrupt: false) }
+    }
+
+    /// Adds a line to the transcript, tagged with where the avatar is.
+    private func log(_ text: String, who: String = "you") {
+        transcript.add(who, text, place: "\(explorer.roomName), \(explorer.floor.name)")
     }
 
     // MARK: Asking aloud
@@ -201,18 +232,31 @@ final class AppModel: ObservableObject {
         guard listening else { return }
         listening = false
         haptics.listening(false)
-        guard Date().timeIntervalSince(listenStart) >= 0.3 else {
+        let held = Date().timeIntervalSince(listenStart)
+        guard held >= 0.3 else {
             listener.cancel()
+            log("Tapped Ask without holding")
             audio.cue(listening: false)
             speech.resume { speech.say("Hold the button while you ask.", interrupt: true) }
             return
         }
         listener.finish { [weak self] heard in
             guard let self else { return }
+            self.logListening(held: held, heard: heard)
             self.speech.resume { self.answer(heard) }
         }
         // After `finish`, which hands the audio session back to playback.
         audio.cue(listening: false)
+    }
+
+    /// "Mic held 1.4 s, recognizer final. Guesses: "where", "where am I"."
+    /// Guesses are listed only when they say something the answer doesn't.
+    private func logListening(held: TimeInterval, heard: String) {
+        var text = String(format: "Mic held %.1f s, recognizer %@.", held, listener.ending)
+        if listener.guesses != [heard], !listener.guesses.isEmpty {
+            text += " Guesses: " + listener.guesses.suffix(5).map { "\"\($0)\"" }.joined(separator: ", ") + "."
+        }
+        log(text, who: "event")
     }
 
     private static let permissionHelp =
@@ -220,14 +264,55 @@ final class AppModel: ObservableObject {
 
     private func answer(_ heard: String) {
         let match = Question.match(heard, in: house, from: explorer.floorIndex, at: explorer.position)
+        log(heard.isEmpty ? "Asked, but nothing was heard" : "Asked \"\(heard)\" (\(understood(match)))")
         switch match {
         case .whereAmI: explorer.whereAmI()
         case .waysOut: explorer.waysOut()
         case .frontDoor: explorer.wayToFrontDoor()
-        case let .room(floor, index): explorer.wayTo(room: index, onFloor: floor)
+        case let .room(floor, index): speech.request(Directions.stepsTo(room: index, onFloor: floor, explorer))
+        case let .guide(floor, index):
+            if tourRunning {
+                tour.stop(silently: true)
+                tourRunning = false
+            }
+            guide.start(room: index, onFloor: floor)
+        case .listRooms: speech.request(Directions.listRooms(explorer))
+        case .aroundMe: speech.request(Directions.aroundMe(explorer))
+        case .walls: speech.request(Directions.walls(explorer))
+        case .tour:
+            if tourRunning {
+                speech.say("The tour is already running. Say stop to end it.", interrupt: true)
+            } else {
+                startTour()
+            }
+        case .stop:
+            if guide.running {
+                guide.stop()
+            } else if tourRunning {
+                toggleTour()
+            } else {
+                speech.say("Nothing to stop.", interrupt: true)
+            }
         case nil:
             let lead = heard.isEmpty ? "I didn't catch that." : "I heard \(heard)."
             speech.say(lead + " " + Question.examples, interrupt: true)
+        }
+    }
+
+    /// How a question was taken, for the transcript.
+    private func understood(_ match: Question?) -> String {
+        switch match {
+        case .whereAmI: "where am I"
+        case .waysOut: "ways out"
+        case .frontDoor: "way to the front door"
+        case let .room(floor, index): "steps to \(house.floors[floor].rooms[index].name)"
+        case let .guide(floor, index): "guide to \(house.floors[floor].rooms[index].name)"
+        case .listRooms: "list rooms"
+        case .aroundMe: "what's around me"
+        case .walls: "walls"
+        case .stop: "stop"
+        case .tour: "start the tour"
+        case nil: "not understood"
         }
     }
 

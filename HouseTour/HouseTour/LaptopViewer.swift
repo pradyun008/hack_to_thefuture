@@ -25,6 +25,8 @@ final class LaptopViewer {
     private let lock = NSLock()
     private var snapshot = Snapshot()
     private var houseJSON = Data()   // guarded by `lock`, like `snapshot`
+    /// Served at /transcript. Set before `start`.
+    var transcript: Transcript?
 
     /// Serves `demo`'s house file from now on, and tells open pages to reload it.
     func show(_ demo: DemoHouse) {
@@ -73,10 +75,22 @@ final class LaptopViewer {
                 connection.cancel()
                 return
             }
-            // "GET /state HTTP/1.1" -> "/state"
-            let path = request.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
+            // "GET /transcript?after=4 HTTP/1.1" -> "/transcript", ["after": "4"]
+            let target = request.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
+            let url = URLComponents(string: target)
+            let path = url?.path ?? "/"
+            let query = Dictionary((url?.queryItems ?? []).map { ($0.name, $0.value ?? "") }) { a, _ in a }
             let (body, type): (Data, String)
+            var extraHeaders = ""
             switch path {
+            case "/transcript":
+                let after = query["after"].flatMap(Int.init) ?? -1
+                let entries = self.transcript?.entries(after: after) ?? []
+                (body, type) = ((try? JSONEncoder().encode(entries)) ?? Data(), "application/json")
+            case "/transcript.txt":
+                (body, type) = (Data((self.transcript?.text ?? "").utf8), "text/plain; charset=utf-8")
+                let name = self.transcript?.fileName ?? "House Tour transcript.txt"
+                extraHeaders = "Content-Disposition: attachment; filename=\"\(name)\"\r\n"
             case "/house.json":
                 self.lock.lock()
                 let json = self.houseJSON
@@ -91,7 +105,7 @@ final class LaptopViewer {
                 (body, type) = (Data(viewerPage.utf8), "text/html; charset=utf-8")
             }
             let header = "HTTP/1.1 200 OK\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\n"
-                + "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
+                + extraHeaders + "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
             connection.send(content: Data(header.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
         }
     }
@@ -130,7 +144,17 @@ private let viewerPage = #"""
 <style>
 *{box-sizing:border-box}html,body{margin:0;height:100%}
 body{background:#fff;color:#111;font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
-  -webkit-font-smoothing:antialiased;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+  -webkit-font-smoothing:antialiased;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-columns:minmax(0,1fr) 380px}
+header,.stage,footer{grid-column:1}
+#log{grid-column:2;grid-row:1/-1;border-left:1px solid #eee;display:flex;flex-direction:column;min-height:0}
+#log h2{display:flex;justify-content:space-between;align-items:baseline;margin:0;padding:22px 20px 12px;
+  font-size:12px;font-weight:500;color:#8a8a8a}
+#log h2 a{color:#2563eb;text-decoration:none}
+#lines{list-style:none;margin:0;padding:0 20px 20px;overflow-y:auto;flex:1}
+#lines li{padding:7px 0;border-bottom:1px solid #f3f3f3}
+#lines .meta{font-size:11px;color:#a3a3a3}
+#lines .you .meta b{color:#c2410c}#lines .app .meta b{color:#2563eb}#lines .skipped{opacity:.55}#lines .event{opacity:.55;font-size:.9em}
 header{display:flex;justify-content:space-between;gap:16px;padding:22px 36px;font-size:12px;color:#8a8a8a}
 #status{display:flex;gap:8px;align-items:center;color:#2563eb}
 #status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
@@ -144,12 +168,15 @@ footer{padding:20px 36px 36px;max-width:900px;width:100%;margin:0 auto;text-alig
 #ticks i{width:22px;height:3px;border-radius:2px;background:#e6e6e6}
 #ticks i.done{background:#a9c2f5}#ticks i.now{background:#2563eb}
 #said{font-size:22px;line-height:1.45;color:#222;min-height:64px;margin:0;transition:opacity .8s}
+@media(max-width:900px){body{grid-template-columns:1fr;grid-template-rows:auto 60vh auto auto}
+  #log{grid-column:1;grid-row:auto;border-left:0;border-top:1px solid #eee}#lines{max-height:50vh}}
 @media(max-width:700px){header,footer{padding-left:18px;padding-right:18px}.stage{margin:0 18px}#said{font-size:18px}}
 @media(prefers-reduced-motion:reduce){#said{transition:none}}
 </style></head><body>
 <header><span id="address">Waiting for your iPhone…</span><span id="status" class="off">Connecting</span></header>
 <div class="stage"><canvas id="map" role="img" aria-label="Live floor plan with your position. The room and floor are written below it."></canvas></div>
 <footer><div id="where" aria-live="polite">Open House Tour on your iPhone</div><div id="ticks" aria-hidden="true"></div><p id="said" aria-live="polite"></p></footer>
+<aside id="log"><h2>Transcript <a href="/transcript.txt" download>Download</a></h2><ol id="lines"></ol></aside>
 <script>
 const palette = { room: "#ffffff", wall: "#2b2b2b", window: "#bcd3f5", stairs: "#ededed", label: "#a3a3a3",
                   route: "rgba(37,99,235,.28)", stop: "rgba(37,99,235,.55)", trail: "rgba(37,99,235,.5)", you: "#2563eb" };
@@ -278,6 +305,30 @@ async function loadHouse(name) {
   lastFloor = -1;
 }
 
+// The transcript only grows, so fetch what's after the last line shown.
+let lastLine = -1;
+const whoLabel = { you: "You", app: "App", skipped: "Skipped, app was talking", event: "Event" };
+async function pollTranscript() {
+  try {
+    const entries = await (await fetch(`/transcript?after=${lastLine}`, { cache: "no-store" })).json();
+    const list = $("lines"), atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+    for (const e of entries) {
+      const li = document.createElement("li"), meta = document.createElement("div"), text = document.createElement("div");
+      li.className = e.who;
+      meta.className = "meta";
+      const time = new Date(e.time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      meta.append(Object.assign(document.createElement("b"), { textContent: whoLabel[e.who] || e.who }), ` · ${time} · ${e.place}`);
+      text.textContent = e.text;
+      li.append(meta, text);
+      list.append(li);
+      lastLine = e.id;
+    }
+    if (entries.length && atBottom) list.scrollTop = list.scrollHeight;
+  } catch (e) {}
+  setTimeout(pollTranscript, 500);
+}
+
 poll();
+pollTranscript();
 </script></body></html>
 """#

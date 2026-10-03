@@ -4,7 +4,7 @@ import SwiftUI
 /// testers found everything-on overwhelming, so only what's needed to walk the
 /// house is on at first. The settings sheet and Explorer read the same keys.
 enum Setting: String, CaseIterable, Identifiable {
-    case wallHum, beacon, textures, wind, speakRooms, speakDoors, speakObstacles, showMap, laptopViewer
+    case wallHum, beacon, textures, wind, turnTicks, speakRooms, speakDoors, speakObstacles, showMap, laptopViewer
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum Setting: String, CaseIterable, Identifiable {
         case .beacon: "Front door chime while touching"
         case .textures: "Floor texture vibration"
         case .wind: "Wind sound outside"
+        case .turnTicks: "Turn ticks while guiding"
         case .speakRooms: "Speak room names"
         case .speakDoors: "Speak doors when you reach them"
         case .speakObstacles: "Speak windows, railings, and fixtures"
@@ -28,6 +29,7 @@ enum Setting: String, CaseIterable, Identifiable {
         case .beacon: "A repeating chime placed at the front door."
         case .textures: "A pattern every few steps that tells hardwood, carpet, tile, concrete, and deck apart."
         case .wind: "Loops quietly while you are outside the house."
+        case .turnTicks: "A soft tick in the ear you should turn toward, until you face the way to go."
         case .speakRooms: "Says the room name when you walk into it."
         case .speakDoors: "Says where a door goes when you are standing in it."
         case .speakObstacles: "Says the name when you bump something other than a plain wall."
@@ -38,7 +40,7 @@ enum Setting: String, CaseIterable, Identifiable {
 
     var defaultValue: Bool {
         switch self {
-        case .textures, .speakRooms, .speakDoors, .laptopViewer: true
+        case .textures, .turnTicks, .speakRooms, .speakDoors, .laptopViewer: true
         case .wallHum, .beacon, .wind, .speakObstacles, .showMap: false
         }
     }
