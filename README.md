@@ -42,13 +42,24 @@ tap puts you back on at the nearest point.
 - Drag one finger: walk. The avatar moves by how far the finger moves, not to
   where it is. Lifting and touching again never moves you. Walls stop you, and
   keep knocking while you push into them.
-- On the path, only along-the-path movement counts: drag ahead to go onward,
-  drag back to come back, and a sideways drag does nothing. The trackpad turns
-  with the route, so "ahead" stays onward around a corner. The two ends of the
-  route knock like walls.
-- Off the path, directions are relative to the way you face, and so is the
-  trackpad: drag up to go "ahead", drag left to go "on your left". On lift you
-  turn to face the way you walked, unless you backed up.
+- Wear motion-capable AirPods Pro, select them as the iPhone audio output, and
+  allow Motion access when prompted. Turn your head left/right to turn the
+  avatar. Horizontal drags never move or rotate it.
+- Look straight ahead and tap **Settings → Calibrate forward**. This pose
+  points the map arrow straight up (heading zero). Turning left/right rotates
+  relative to it; returning to forward points up again. Tour restarts, route
+  rejoining, floor changes and house changes preserve the calibrated direction.
+  The first motion sample also establishes forward; recalibrate after reconnecting
+  or changing your seated direction.
+- On the path, drag up to follow the route and down to retrace it, regardless
+  of where you look. Off the path, up walks in your head-controlled direction
+  and down walks backward. Lifting does not change your heading.
+- A 120 ms, 2.4 kHz beep sounds on entering the one-foot zone around blocking
+  geometry. It rearms after moving more than 1.25 feet away, so it does not
+  continuously squeal beside a wall. This measures virtual geometry only.
+- Narration, ambience, beacon and warning use the iPhone's selected audio route;
+  with AirPods selected, they play through AirPods. VoiceOver announcements
+  follow the system VoiceOver audio route.
 - Single tap: which room you're in. During the guided tour, the way to the next
   stop.
 - Double tap: leave the path, or rejoin it at the nearest point.
@@ -109,3 +120,45 @@ types, so every room except the garage is "Floor type not listed".
 ```sh
 .venv/bin/python tools/trace_waterville.py
 ```
+
+## Head-motion verification
+
+Open `HouseTour/HouseTour.xcodeproj` in full Xcode and run on a physical iPhone.
+Connect AirPods Pro and allow Motion access. Check that looking left/right
+rotates the map arrow in the same direction, including across the yaw wrap;
+calibrate while looking straight ahead and confirm returning to that pose
+points the arrow straight up, including after restarting the tour or rejoining
+the route;
+horizontal drags do nothing; forward/backward drags retain the heading; the
+fixed route still follows corners; and disconnect/reconnect resumes tracking
+without a sudden turn. Backgrounding pauses motion updates.
+
+Test a slow and fast approach to a wall, restarting the tour or changing
+houses near a wall, retreat
+past 1.25 feet and reentry. Confirm one short beep per approach and that speech
+and effects reach the AirPods, with VoiceOver both enabled and disabled. Check
+Motion permission denied and unsupported headphones for the spoken status.
+
+## Live Mac AirPods demonstration
+
+Run the Debug build on the HouseTour Review simulator. In the app's Settings,
+turn on **Show map** and **Laptop viewer**. Open `http://127.0.0.1:8080` on
+this Mac to see the dashed tour route and live avatar.
+
+Connect and wear AirPods Pro, select them as the Mac's audio output, then run
+`bash tests/build-airpods-probe.sh`. Open `/tmp/HouseTourAirPodsProbe.app` and
+allow Motion access. The native Mac probe uses the app's actual HeadMotion
+controller and forwards the absolute direction relative to calibrated forward
+to the simulator. Look straight ahead and click **Calibrate forward** in the
+probe, or use the same control in the simulator's Settings. Both controls
+recenter the actual Mac sensor reference and mobile arrow together. Its warning button
+plays the iPhone app's warning when the bridge is reachable; otherwise it plays
+the same synthesized warning locally. Close the probe window to stop tracking.
+
+The bridge listens only on `127.0.0.1:8081` and is compiled only for Debug
+Simulator builds. It is absent from iPhone and Release builds. On a real iPhone,
+connect AirPods directly to that iPhone; no Mac probe or bridge is used.
+
+Vertical drags walk along the path. Horizontal drags do nothing. Double tap
+leaves the path or rejoins it. Head motion changes the arrow and audio listener
+heading without translating the avatar.

@@ -3,14 +3,20 @@ import AVFoundation
 /// Non-speech sound. Units are feet: the listener stands where the avatar is,
 /// facing the avatar's heading (up the screen is -z), so the front door beacon
 /// pans and fades as the avatar moves and turns, matching the spoken directions. Works on any stereo headphones. Bluetooth adds ~200 ms of lag,
-/// so nothing time-critical lives here; wall hits are haptic only.
+/// wall contacts also retain their immediate haptic feedback.
 final class SpatialAudio {
     private let engine = AVAudioEngine()
     private let environment = AVAudioEnvironmentNode()
     private let beacon = AVAudioPlayerNode()
     private let wind = AVAudioPlayerNode()
     private let effects = AVAudioPlayerNode()
+    private let warning = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
+
+    private lazy var warningBuffer = Synth.buffer(format, seconds: 0.12) { _, t in
+        let envelope = min(t / 0.008, 1, (0.12 - t) / 0.015)
+        return Float(0.22 * envelope * sin(2 * .pi * 2400 * t))
+    }
 
     private lazy var beaconLoop = Synth.beaconLoop(format)
     private lazy var chimeBuffer = Synth.chime(format, gain: 0.8)
@@ -24,11 +30,12 @@ final class SpatialAudio {
         try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? session.setActive(true)
 
-        [environment, beacon, wind, effects].forEach(engine.attach)
+        [environment, beacon, wind, effects, warning].forEach(engine.attach)
         engine.connect(environment, to: engine.mainMixerNode, format: nil)
         engine.connect(beacon, to: environment, format: format)
         engine.connect(wind, to: engine.mainMixerNode, format: format)
         engine.connect(effects, to: engine.mainMixerNode, format: format)
+        engine.connect(warning, to: engine.mainMixerNode, format: format)
 
         beacon.renderingAlgorithm = .HRTFHQ
         beacon.sourceMode = .pointSource
@@ -111,6 +118,13 @@ final class SpatialAudio {
         } else {
             wind.stop()
         }
+    }
+
+    /// Short high-pitched warning, independent of narration and other effects.
+    func wallWarning() {
+        guard start() else { return }
+        warning.scheduleBuffer(warningBuffer, at: nil, options: .interrupts)
+        warning.play()
     }
 
     /// Front door chime, played in the head (not spatial).

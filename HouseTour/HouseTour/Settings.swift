@@ -56,6 +56,7 @@ enum Setting: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    let calibrateForward: () -> Void
     /// Closes the sheet and plays the haptic tutorial.
     let replayTutorial: () -> Void
     @AppStorage(DemoHouse.key) private var demoHouse = DemoHouse.current
@@ -75,6 +76,14 @@ struct SettingsView: View {
                     }
                 } footer: {
                     Text("Switching houses starts its guided tour.")
+                }
+                Section {
+                    Button("Calibrate forward", action: calibrateForward)
+                        .accessibilityHint("Look straight ahead, then activate. This pose points the map arrow straight up.")
+                } header: {
+                    Text("AirPods direction")
+                } footer: {
+                    Text("Wear your AirPods and look straight ahead, then tap Calibrate forward. Left and right head turns rotate from this position. Recalibrate after reconnecting or changing your seated direction.")
                 }
                 Section {
                     ForEach(Setting.allCases) { SettingRow(setting: $0) }

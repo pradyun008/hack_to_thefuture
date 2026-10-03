@@ -17,17 +17,15 @@ default the avatar is locked to a **path**: the hand-written route through
 every room, the same polyline the guided tour walks, which the tracer already
 proves never crosses a wall.
 
-On the path there is one degree of freedom. The finger's movement is projected
-onto the route's own direction: dragging onward walks onward, dragging back
-retraces, and a sideways drag does nothing instead of grinding into a wall. The
-heading is the route's direction, updated as you go, so "drag up" keeps meaning
-"onward" around a corner — there is no spin risk the way there is in open floor,
-because on a track a sideways drag cannot turn you. The two ends of the route
-knock like walls, because that is where it runs out.
+On the path there is one degree of freedom for position. Drag up to follow
+it and down to retrace it, regardless of where you look. Horizontal drags do
+nothing. AirPods head motion controls the avatar's viewing direction while
+movement follows the route around corners. The two ends of the route knock
+like walls.
 
-A double tap steps off the path, for feeling out a room properly; walls stop
-you as usual and the heading goes back to the way you walked. Another double tap
-snaps you to the nearest point of the route and locks you to it again.
+A double tap steps off the path, for feeling out a room; walls still stop
+you and head motion keeps controlling the heading. Another double tap snaps
+you to the nearest point of the route while preserving the calibrated head direction.
 
 The route doubles back on itself — out to the half bath and in again along
 nearly the same line — so one spot on the floor can be two places on the route,
@@ -39,15 +37,17 @@ While on the path the tour gives distances along it ("Ahead along the path,
 4 steps") instead of bearings, since a bearing is noise when there is
 nowhere to go but forward and back.
 
-The avatar faces the way it last walked, and the trackpad turns with it:
-finger up walks ahead, finger right walks to your right, finger down backs up.
-The heading holds still while the finger is down, so a sideways drag can't
-spin you in circles. On lift it turns to the way that drag walked (taken over
-the last 1.5 ft of travel, so jitter can't flip it), unless you backed up,
-which keeps your heading. It starts facing into the house, away from the
-front door. Every spoken direction ("ahead", "on your left", "behind you on
-your right") is relative to that heading, and the front door beacon turns
-with it, so "on your left" always means drag left, never the left of the map.
+Motion-capable AirPods Pro supply yaw through Core Motion. Turning your head
+left or right rotates the avatar in that direction. Off the path, drag up to
+walk in the direction you face and down to walk backward. Horizontal drags
+and lifting never rotate the avatar. The first valid motion sample becomes
+forward, pointing straight up on the map. In Settings, **Calibrate forward**
+captures the wearer's current straight-ahead pose as that same zero direction.
+Heading is measured from this pose, so returning to it returns the arrow to up.
+Starting a tour, changing floors, switching houses and rejoining the route all
+preserve the calibrated direction. Spoken directions and the spatial beacon
+use it too. Tracking pauses in the background and uses a new forward reference
+after restart or reconnect; look straight ahead and recalibrate when needed.
 
 The map is hidden. The touch surface is plain and dark with a one-line hint.
 "Show map" in settings draws the plan and the avatar (a dot with a pointed head
@@ -55,8 +55,8 @@ showing its heading) for sighted people watching. Movement works the same either
 
 The rule for splitting the channels: **anything the avatar touches is haptic,
 anything about direction or distance is audio, and words are for names.**
-Bluetooth audio lags about 200 ms, so nothing time-critical goes through the
-earphones.
+Wall contact keeps its haptic feedback. A separate short audio warning sounds
+on entry within one foot of blocking geometry; Bluetooth can delay the sound.
 
 ## Settings
 
@@ -97,13 +97,18 @@ smooth pulses, because testers felt crisp tile and hardwood taps as the same thi
 as the wall knock. They play per footstep, not continuously, because constant vibration
 numbs the hand. There is no footstep sound; floors are felt only.
 
-## Sound (any headphones; AirPods optional)
+## Sound and AirPods
 
 | Sound | What it tells you | When |
 |---|---|---|
 | Front door beacon | Direction and distance to the entrance | Two-note chime every 1.5 s, placed in 3D at the door. While touching if switched on |
 | Front door chime | You're at the front door | Once per arrival |
 | Wind | You've left the house | Only if switched on |
+| Wall proximity warning | Within one foot of blocking geometry | 120 ms at 2.4 kHz on entry, rearms beyond 1.25 ft |
+
+Sounds use the selected iPhone audio output. AirPods selected as the output
+receive speech and effects; VoiceOver follows its system audio route. Head
+turning requires motion-capable AirPods and Motion permission.
 
 ### Spoken (VoiceOver if it's on, otherwise the built-in voice)
 
@@ -179,9 +184,8 @@ chatter.
 ## Known limits
 
 - The phone vibrates as one unit, so left and right come only from audio.
-- The "Go upstairs" button puts you on the stairs. Climbing by holding still
-  keeps your spot.
+- Floors change by holding still on the stairs with a finger down.
 - The path is the tour's route, so it reaches every narrated room but not every
   corner of every room. Stepping off is how you reach the rest.
-- No phone-rotation or AirPods head tracking yet. Ahead is the avatar's
-  walking direction, not the way the user's head or phone points.
+- AirPods track head orientation, not real-world location or walls. Wall
+  warnings measure only the virtual floor plan.

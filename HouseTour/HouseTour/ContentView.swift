@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var app = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("didTutorial") private var didTutorial = false
     @AppStorage(Setting.showMap.rawValue) private var showMap = Setting.showMap.defaultValue
     @AppStorage(DemoHouse.key) private var demoHouse = DemoHouse.current
@@ -44,13 +45,18 @@ struct ContentView: View {
             .padding()
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView {
+            SettingsView(calibrateForward: app.calibrateForward) {
                 showingSettings = false
                 app.runTutorial()
             }
         }
         .onChange(of: demoHouse) { _, demo in app.switchHouse(to: demo) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { app.headMotion.start() } else { app.headMotion.stop() }
+        }
+        .onDisappear { app.headMotion.stop() }
         .onAppear {
+            app.headMotion.start()
             guard !launched else { return }
             launched = true
             let firstRun = !didTutorial

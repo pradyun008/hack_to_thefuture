@@ -10,13 +10,12 @@ final class Explorer: ObservableObject {
     @Published private(set) var floorIndex = 0
     @Published private(set) var position: CGPoint
     @Published private(set) var roomName = ""
-    /// The way the avatar faces, in radians (0 = up the screen, clockwise). The
-    /// trackpad turns with it: finger up walks ahead, finger right walks to your
-    /// right. It holds still while the finger is down, so a sideways drag can't
-    /// spin you, and on lift turns to the way you walked (unless you backed up).
+    /// Head-controlled direction, radians (0 = up the screen, clockwise).
     @Published private(set) var heading: Double {
         didSet { audio.face(heading) }
     }
+    /// Once calibrated, route changes must not replace the head direction.
+    private(set) var headHeading: Double?
     /// Whether the avatar is locked to the route. On the rail it can only slide
     /// forward and back, which is what makes a big room impossible to get lost
     /// in. A double tap steps off and back on.
@@ -43,8 +42,6 @@ final class Explorer: ObservableObject {
     private var lastLabel: Int?      // room under the avatar
     private var pending: (room: Int?, since: Date, origin: CGPoint)?
     private var strideDistance = 0.0
-    private var trail: [CGPoint] = []  // recent path, newest last, for the heading
-    private var travelHeading: Double?  // way this drag walked, applied on lift
     private var atDoors = Set<Int>()  // doors already announced on this arrival
     private var contact: [CellKind?] = [nil, nil]   // what each axis (x, y) last bumped
     private var lastHit = [Date.distantPast, Date.distantPast]
@@ -55,12 +52,12 @@ final class Explorer: ObservableObject {
     private var railRun = 0      // which storey's stretch of the route
     private var railPos = 0.0    // feet along that stretch
     private var timer: Timer?
+    private var wallWarningArmed = true
 
     static let stride = 2.5          // ft per virtual footstep
     static let warningZone = 1.5     // ft from a wall where the hum starts
     static let doorReach = 1.0       // ft from a door's opening that counts as "at the door"
     static let doorRearm = 2.0       // ft away before the same door is announced again
-    static let headingWindow = 1.5   // ft of travel the heading is taken over
     static let knockRepeat = 0.3     // s between knocks while pushing into a wall
 
     init(house: House, haptics: Haptics, audio: SpatialAudio, speech: Speaker) {
@@ -89,9 +86,9 @@ final class Explorer: ObservableObject {
         lastLabel = plan.roomIndex(at: start)
         currentRoom = lastLabel
         roomName = currentRoom.map { plan.rooms[$0].name } ?? "Outside"
-        trail = [start]
         audio.moveListener(to: start)
         audio.face(facing)
+        checkWallWarning(start)
     }
 
     var isOnStairs: Bool { currentRoom.map { floor.rooms[$0].isStairs } ?? false }
@@ -105,8 +102,6 @@ final class Explorer: ObservableObject {
     /// that run while touching.
     func touchDown() {
         touching = true
-        trail = [position]
-        travelHeading = nil
         updateBeacon()
         audio.setWind(Setting.wind.isOn && currentRoom == nil)
         stairsHold = nil
@@ -114,16 +109,23 @@ final class Explorer: ObservableObject {
         startTimer()
     }
 
-    /// Trackpad input: move by `delta` feet, stopping at walls. `delta` is in
-    /// screen terms (up is -y) and gets turned to the heading, so up is ahead.
+    /// Head turning is the only source of user-controlled rotation.
+    func faceHead(_ radians: Double) {
+        guard radians.isFinite else { return }
+        let normalized = atan2(sin(radians), cos(radians))
+        headHeading = normalized
+        heading = normalized
+    }
+
+    /// Horizontal drags are ignored. Vertical drags walk forward/backward.
     func drag(by delta: CGVector) {
         guard touching else { return }
-        let s = sin(heading), c = cos(heading)
-        let step = CGVector(dx: delta.dx * c - delta.dy * s, dy: delta.dx * s + delta.dy * c)
         if onRail, let rail {
-            slideRail(rail, by: step)
+            let t = rail.tangent(run: railRun, at: railPos)
+            slideRail(rail, by: CGVector(dx: -delta.dy * t.dx, dy: -delta.dy * t.dy))
             return
         }
+        let step = CGVector(dx: -delta.dy * sin(heading), dy: delta.dy * cos(heading))
         let move = floor.slide(from: position, by: step)
         bump(x: move.hitX, y: move.hitY, pushing: step, at: move.end)
         walk(to: move.end)
@@ -151,10 +153,8 @@ final class Explorer: ObservableObject {
         for corner in rail.corners(run: railRun, from: railPos, to: next) { walk(to: corner) }
         railPos = next
         walk(to: rail.point(run: railRun, at: next))
-        // The trackpad turns with the route, so "drag up" keeps meaning "onward"
-        // around a corner. There's no spin risk the way there is in open floor:
-        // on a track, a sideways drag can't turn you.
-        heading = railHeading(rail)
+        // The route controls position while headphones control viewing direction.
+        // Preserve the headphone-controlled heading while walking.
     }
 
     /// The compass angle of the route where the avatar stands, facing onward.
@@ -198,8 +198,6 @@ final class Explorer: ObservableObject {
         }
         position = p
         audio.moveListener(to: p)
-        // On the rail the heading comes from the route, not from the way you walked.
-        if !onRail { updateHeading(p) }
         strideDistance += d
         if strideDistance >= Self.stride {
             strideDistance = 0
@@ -218,15 +216,6 @@ final class Explorer: ObservableObject {
             commit(pend.room)
         }
         touching = false
-        // Face the way you walked. Backing up keeps your heading, the way a
-        // person stepping back still faces forward.
-        if let h = travelHeading, !onRail {
-            var turn = (h - heading).truncatingRemainder(dividingBy: 2 * .pi)
-            if turn > .pi { turn -= 2 * .pi }
-            if turn < -.pi { turn += 2 * .pi }
-            if abs(turn) <= .pi * 3 / 4 { heading = h }
-        }
-        travelHeading = nil
         pending = nil
         stairsHold = nil
         timer?.invalidate()
@@ -299,6 +288,7 @@ final class Explorer: ObservableObject {
     /// aligned there). From the button it lands on the stairs, since the same
     /// spot on the other floor could be inside a wall.
     func changeFloor(viaStairs: Bool = false) {
+        wallWarningArmed = true
         let goingUp = floorIndex == 0
         floorIndex = goingUp ? 1 : 0
         if viaStairs { haptics.stairs(up: goingUp) }
@@ -309,19 +299,19 @@ final class Explorer: ObservableObject {
             railRun = run
             railPos = onward ? 0 : rail.length(of: run)
             position = rail.point(run: run, at: railPos)
-            heading = railHeading(rail)
+            heading = headHeading ?? railHeading(rail)
             audio.moveListener(to: position)
         } else if !viaStairs, let landing = house.stairLanding {
             position = landing
             audio.moveListener(to: landing)
         }
-        trail = [position]
         stairsArmed = false
         stairsHold = nil
         pending = nil
         currentFixture = nil
         contact = [nil, nil]
         let p = position
+        checkWallWarning(p)
         atDoors = doorsInReach(p)
         lastLabel = floor.roomIndex(at: p)
         setRoom(lastLabel)
@@ -338,7 +328,7 @@ final class Explorer: ObservableObject {
         onUpdate?()
     }
 
-    /// Puts the avatar somewhere directly, for the tour's restart and jump.
+    /// Puts the avatar somewhere directly, for tour starts and route rejoining.
     /// Says nothing; the tour narrates.
     /// `tourStep` is the step of `house.tour` being jumped to, when the caller
     /// knows it. On the rail that's better than the coordinates: the route
@@ -347,18 +337,19 @@ final class Explorer: ObservableObject {
     func teleport(to p: CGPoint, floor index: Int, heading: Double, tourStep: Int? = nil) {
         if floorIndex != index { floorIndex = index }
         position = p
-        self.heading = heading
+        self.heading = headHeading ?? heading
         if onRail, let rail {
             let exact = tourStep.flatMap { rail.location(ofTourStep: $0) }
             if let spot = exact ?? rail.run(onFloor: index).map({ ($0, rail.project(p, run: $0, near: railPos)) }) {
                 railRun = spot.0
                 railPos = spot.1
                 position = rail.point(run: railRun, at: railPos)
-                self.heading = railHeading(rail)
+                self.heading = headHeading ?? railHeading(rail)
             }
         }
         let landed = position
-        trail = [landed]
+        wallWarningArmed = true
+        checkWallWarning(landed)
         audio.moveListener(to: landed)
         lastLabel = floor.roomIndex(at: landed)
         setRoom(lastLabel)
@@ -408,27 +399,9 @@ final class Explorer: ObservableObject {
         }
     }
 
-    /// The way you walked is the direction from where the avatar was 1.5 ft of
-    /// walking ago to where it is now. Jiggling back and forth covers distance
-    /// without going anywhere, so it only counts when that line is long enough.
-    /// It's held until lift: turning mid-drag would turn the trackpad under the
-    /// finger and walk you in circles.
-    private func updateHeading(_ p: CGPoint) {
-        if let last = trail.last, last.distance(to: p) < 0.1 { return }
-        trail.append(p)
-        var length = 0.0
-        var oldest = trail.count - 1
-        while oldest > 0, length < Self.headingWindow {
-            length += trail[oldest].distance(to: trail[oldest - 1])
-            oldest -= 1
-        }
-        trail.removeFirst(oldest)
-        guard length >= Self.headingWindow, let tail = trail.first,
-              tail.distance(to: p) >= Self.headingWindow * 0.6 else { return }
-        travelHeading = bearing(from: tail, to: p)
-    }
-
+    /// Sample the complete movement segment for warnings and room entries.
     private func sample(_ q: CGPoint) {
+        checkWallWarning(q)
         let label = floor.roomIndex(at: q)
         guard label != lastLabel else { return }
         lastLabel = label
@@ -548,7 +521,19 @@ final class Explorer: ObservableObject {
         haptics.texture(floor.rooms[room].floor)
     }
 
+    /// One short warning on entry; leave by 1.25 ft before rearming.
+    /// Check every movement sample so a large drag cannot skip the zone.
+    private func checkWallWarning(_ p: CGPoint) {
+        let distance = floor.distanceToBlocking(from: p, within: 1.25)
+        if let distance, distance <= 1 {
+            if wallWarningArmed { audio.wallWarning(); wallWarningArmed = false }
+        } else if distance == nil {
+            wallWarningArmed = true
+        }
+    }
+
     private func updateProximity(_ p: CGPoint) {
+        checkWallWarning(p)
         guard touching, Setting.wallHum.isOn,
               let d = floor.distanceToBlocking(from: p, within: Self.warningZone) else {
             return haptics.proximity(0)

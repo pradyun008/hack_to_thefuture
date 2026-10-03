@@ -23,6 +23,7 @@ targets:
         CFBundleDisplayName: House Tour
         UILaunchScreen: {}
         UIRequiresFullScreen: true
+        NSMotionUsageDescription: Uses AirPods head motion to turn left and right in the virtual house.
         NSLocalNetworkUsageDescription: Lets a laptop on the same Wi-Fi show the floor plan live while you explore.
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIApplicationSceneManifest:

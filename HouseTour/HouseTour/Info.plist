@@ -20,6 +20,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Uses AirPods head motion to turn left and right in the virtual house.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Lets a laptop on the same Wi-Fi show the floor plan live while you explore.</string>
 	<key>UIApplicationSceneManifest</key>
