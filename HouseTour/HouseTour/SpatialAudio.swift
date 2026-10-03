@@ -1,8 +1,8 @@
 import AVFoundation
 
 /// Non-speech sound. Units are feet: the listener stands where the avatar is,
-/// facing up the screen (-z), so the front door beacon pans and fades as the
-/// avatar moves. Works on any stereo headphones. Bluetooth adds ~200 ms of lag,
+/// facing the avatar's heading (up the screen is -z), so the front door beacon
+/// pans and fades as the avatar moves and turns, matching the spoken directions. Works on any stereo headphones. Bluetooth adds ~200 ms of lag,
 /// so nothing time-critical lives here; wall hits are haptic only.
 final class SpatialAudio {
     private let engine = AVAudioEngine()
@@ -73,8 +73,20 @@ final class SpatialAudio {
         if windOn { windOn = false; setWind(true) }
     }
 
+    /// Puts the front door chime at a new house's front door.
+    func moveBeacon(to p: CGPoint) {
+        beacon.position = AVAudio3DPoint(x: Float(p.x), y: 0, z: Float(p.y))
+    }
+
     func moveListener(to p: CGPoint) {
         environment.listenerPosition = AVAudio3DPoint(x: Float(p.x), y: 0, z: Float(p.y))
+    }
+
+    /// Turns the listener to `heading` (radians, 0 = up the screen, clockwise).
+    func face(_ heading: Double) {
+        environment.listenerVectorOrientation = AVAudio3DVectorOrientation(
+            forward: AVAudio3DVector(x: Float(sin(heading)), y: 0, z: Float(-cos(heading))),
+            up: AVAudio3DVector(x: 0, y: 1, z: 0))
     }
 
     func setBeacon(_ on: Bool) {

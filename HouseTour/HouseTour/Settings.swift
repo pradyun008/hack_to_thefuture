@@ -56,6 +56,7 @@ enum Setting: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(DemoHouse.key) private var demoHouse = DemoHouse.current
 
     private var viewerHint: String {
         let urls = LaptopViewer.urls
@@ -66,6 +67,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Picker("House", selection: $demoHouse) {
+                        ForEach(DemoHouse.allCases) { Text($0.title).tag($0) }
+                    }
+                } footer: {
+                    Text("Switching houses starts its guided tour.")
+                }
                 Section {
                     ForEach(Setting.allCases) { SettingRow(setting: $0) }
                 } footer: {

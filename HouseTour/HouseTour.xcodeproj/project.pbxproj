@@ -21,6 +21,7 @@
 		B24F05755EF97BC3CFB87620 /* SpatialAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = C43F3AA435F02D410B6ED1D3 /* SpatialAudio.swift */; };
 		B3ECE1753BE758E9865656B3 /* Speaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97726DC77F77BDB6B8CF0F58 /* Speaker.swift */; };
 		B55141977668397901CAFCF3 /* Tutorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 921CE0644165BD5E001C61F0 /* Tutorial.swift */; };
+		D3221F5C11835BDD2A12B441 /* waterville.json in Resources */ = {isa = PBXBuildFile; fileRef = 606613BD3866666F7A6302AA /* waterville.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 		49CB4E56443B0BEB9A1717BD /* Explorer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Explorer.swift; sourceTree = "<group>"; };
 		4B20375CA36C0D0053B83EB8 /* house.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = house.json; sourceTree = "<group>"; };
 		5AC1D059626107BBBAD52F7E /* FloorMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorMapView.swift; sourceTree = "<group>"; };
+		606613BD3866666F7A6302AA /* waterville.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = waterville.json; sourceTree = "<group>"; };
 		647B1763A463AD5E8B1B88F6 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		921CE0644165BD5E001C61F0 /* Tutorial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial.swift; sourceTree = "<group>"; };
 		97726DC77F77BDB6B8CF0F58 /* Speaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Speaker.swift; sourceTree = "<group>"; };
@@ -69,6 +71,7 @@
 				C43F3AA435F02D410B6ED1D3 /* SpatialAudio.swift */,
 				97726DC77F77BDB6B8CF0F58 /* Speaker.swift */,
 				921CE0644165BD5E001C61F0 /* Tutorial.swift */,
+				606613BD3866666F7A6302AA /* waterville.json */,
 			);
 			path = HouseTour;
 			sourceTree = "<group>";
@@ -142,6 +145,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A13D0A02774BCB3211902D72 /* house.json in Resources */,
+				D3221F5C11835BDD2A12B441 /* waterville.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
