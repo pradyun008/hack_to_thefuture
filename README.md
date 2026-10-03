@@ -31,26 +31,35 @@ xcrun devicectl device install app --device <device id from `xcrun devicectl lis
 
 ## Controls
 
-The screen is a trackpad, and the map is hidden. Your avatar starts just inside
-the front door, facing into the house.
+The screen is a trackpad, and the map is hidden. Your avatar starts at the head
+of the path, just inside the front door, facing into the house.
+
+By default you're **on the path**: a fixed route through every room, so there's
+nowhere to get lost. Drag along it to walk, drag back to retrace. A double tap
+steps off it when you want to feel a room out for yourself, and another double
+tap puts you back on at the nearest point.
 
 - Drag one finger: walk. The avatar moves by how far the finger moves, not to
   where it is. Lifting and touching again never moves you. Walls stop you, and
   keep knocking while you push into them.
-- Directions are relative to the way you face, and so is the trackpad: drag
-  up to go "ahead", drag left to go "on your left". On lift you turn to face
-  the way you walked, unless you backed up.
+- On the path, only along-the-path movement counts: drag ahead to go onward,
+  drag back to come back, and a sideways drag does nothing. The trackpad turns
+  with the route, so "ahead" stays onward around a corner. The two ends of the
+  route knock like walls.
+- Off the path, directions are relative to the way you face, and so is the
+  trackpad: drag up to go "ahead", drag left to go "on your left". On lift you
+  turn to face the way you walked, unless you backed up.
 - Single tap: which room you're in. During the guided tour, the way to the next
   stop.
-- Double tap: what's around you. The room, the nearest doors and where they
-  go, the nearest built-in, and the front door.
-- Two-finger tap: where am I.
-- Triple tap: find the front door.
-- Hold still on the stairs, finger down, for about a second: change floors.
+- Double tap: leave the path, or rejoin it at the nearest point.
+- Triple tap: where you are. The room, how close you are to a wall, and the
+  nearest door and where it goes.
+- Hold still on the stairs, finger down, for about a second: change floors. On
+  the path this hands you to the next storey's stretch of the route.
 - Taps and buttons never cut off speech. If something is being said, the
   request is skipped; ask again when it's quiet.
 - Buttons: guided tour, where am I, go up or downstairs, fine movement, find
-  front door, haptic tutorial. The gear opens settings, with a switch for each
+  front door (which also plays the beacon for a few seconds), haptic tutorial. The gear opens settings, with a switch for each
   sound, vibration, and spoken cue, plus "Show map" for people watching. The
   House picker at the top of settings switches demo houses and starts the new
   house's guided tour.
@@ -66,7 +75,10 @@ exploring; the guided tour button still starts it.
 ## Laptop viewer
 
 The phone runs a small web server so a laptop can watch the avatar on the map
-while the phone stays blank. Put the laptop and phone on the same network (the
+while the phone stays blank. The path is drawn on it as a dashed blue line with
+a dot at every corner and a bigger one at every narrated stop, visible from the
+moment the page loads, so you can see where the route goes before anyone walks
+it. The header says whether the avatar is on the path or off it. Put the laptop and phone on the same network (the
 phone's Personal Hotspot works when campus Wi-Fi blocks device-to-device
 traffic), open the gear in the app, and open the address shown at the bottom
 in a browser. It's `http://<phone IP>:8080`. Turn off "Laptop viewer" in

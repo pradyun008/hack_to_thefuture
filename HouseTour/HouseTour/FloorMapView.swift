@@ -4,16 +4,16 @@ import UIKit
 
 /// The touch surface, used like a laptop trackpad. One finger drags the avatar
 /// by the finger's movement, never to where the finger is, so seeing the map
-/// gives no shortcut. Single tap says the room; double tap describes what's
-/// around you; two-finger tap asks "where am I"; triple tap finds the front door. Marked `allowsDirectInteraction` so raw
-/// touches reach it while VoiceOver is on.
+/// gives no shortcut. Single tap says the room; double tap steps off the route
+/// or snaps back onto it; triple tap says where you are. Extra fingers are
+/// ignored so a second one can't drag the avatar. Marked
+/// `allowsDirectInteraction` so raw touches reach it while VoiceOver is on.
 final class FloorMapView: UIView {
     var explorer: Explorer!
     var onTouch: (() -> Void)?
     var onSingleTap: (() -> Void)?
-    var onDoubleTap: (() -> Void)?
+    var onToggleRail: (() -> Void)?
     var onWhereAmI: (() -> Void)?
-    var onFindDoor: (() -> Void)?
 
     /// Feet of avatar movement per point of finger movement. A full-width swipe
     /// (about 390 points) covers roughly 35 ft, two or three rooms.
@@ -43,8 +43,7 @@ final class FloorMapView: UIView {
     private var startPoint = CGPoint.zero
     private var lastPoint = CGPoint.zero
     private var movedFar = false
-    private var multiStart: Date?
-    private var multiMoved = false
+    private var extraFingers = false
     private var tapTimes: [Date] = []
     private var announceWork: DispatchWorkItem?
 
@@ -63,7 +62,7 @@ final class FloorMapView: UIView {
         pointer.lineJoin = .round
         layer.addSublayer(pointer)
 
-        hint.text = "Drag to move. Double tap: what's around you. Two-finger tap: where am I. Triple tap: front door."
+        hint.text = "Drag along the path. Double tap: leave the path or rejoin it. Triple tap: where you are."
         hint.textColor = UIColor(white: 0.6, alpha: 1)
         hint.font = .preferredFont(forTextStyle: .body)
         hint.numberOfLines = 0
@@ -79,7 +78,7 @@ final class FloorMapView: UIView {
 
         isAccessibilityElement = true
         accessibilityLabel = "Touch surface"
-        accessibilityHint = "Drag to move. Single tap for the room. Double tap for what's around you. Two finger tap for where am I. Triple tap to find the front door."
+        accessibilityHint = "Drag to move along the path. Single tap for the room. Double tap to leave the path or rejoin it. Triple tap for where you are."
         accessibilityTraits = .allowsDirectInteraction
     }
 
@@ -144,19 +143,17 @@ final class FloorMapView: UIView {
         onTouch?()
         let all = event?.allTouches?.filter { $0.view === self && $0.phase != .ended && $0.phase != .cancelled } ?? touches
         if all.count >= 2 {
-            // Second finger landed: this is a gesture, not walking.
+            // A second finger landed. Nothing is bound to it, and it must not
+            // walk the avatar, so touches are ignored until the hand lifts.
             announceWork?.cancel()
             if tracking != nil {
                 tracking = nil
                 explorer.touchUp()
             }
-            if multiStart == nil {
-                multiStart = Date()
-                multiMoved = false
-            }
+            extraFingers = true
             return
         }
-        guard tracking == nil, multiStart == nil, let t = touches.first else { return }
+        guard tracking == nil, !extraFingers, let t = touches.first else { return }
         tracking = t
         touchStart = Date()
         startPoint = t.location(in: self)
@@ -167,12 +164,7 @@ final class FloorMapView: UIView {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if multiStart != nil {
-            if touches.contains(where: { $0.location(in: self).distance(to: $0.previousLocation(in: self)) > 8 }) {
-                multiMoved = true
-            }
-            return
-        }
+        if extraFingers { return }
         guard let t = tracking, touches.contains(t) else { return }
         let p = t.location(in: self)
         if p.distance(to: startPoint) > 12 { movedFar = true }
@@ -195,10 +187,9 @@ final class FloorMapView: UIView {
         let remaining = event?.allTouches?.filter {
             $0.view === self && !touches.contains($0) && $0.phase != .ended && $0.phase != .cancelled
         }
-        if let start = multiStart {
-            guard remaining?.isEmpty ?? true else { return }
-            multiStart = nil
-            if !cancelled, !multiMoved, Date().timeIntervalSince(start) < 0.5 { onWhereAmI?() }
+        if extraFingers {
+            // Wait for every finger to come up, then take touches again.
+            if remaining?.isEmpty ?? true { extraFingers = false }
             return
         }
         guard let t = tracking, touches.contains(t) else { return }
@@ -216,18 +207,18 @@ final class FloorMapView: UIView {
         tapTimes = tapTimes.filter { now.timeIntervalSince($0) < 0.9 } + [now]
         if tapTimes.count >= 3 {
             tapTimes = []
-            onFindDoor?()
+            onWhereAmI?()
             return
         }
         // Wait to see whether more taps follow. Each new tap cancels the wait,
-        // so only the final count acts: one tap says the room, two describe
-        // what's around you, and three (above) find the front door.
+        // so only the final count acts: one tap says the room, two step off the
+        // route or rejoin it, and three (above) say where you are.
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             let count = self.tapTimes.count
             self.tapTimes = []
             if count == 1 { self.onSingleTap?() }
-            if count == 2 { self.onDoubleTap?() }
+            if count == 2 { self.onToggleRail?() }
         }
         announceWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
@@ -329,9 +320,8 @@ struct FloorMap: UIViewRepresentable {
         view.explorer = app.explorer
         view.onTouch = { app.interrupt() }
         view.onSingleTap = { app.singleTap() }
-        view.onDoubleTap = { app.explorer.describeSurroundings() }
+        view.onToggleRail = { app.toggleRail() }
         view.onWhereAmI = { app.explorer.whereAmI() }
-        view.onFindDoor = { app.findFrontDoor() }
         context.coordinator.positionSink = app.explorer.$position.map { _ in () }
             .merge(with: app.explorer.$heading.map { _ in () })
             .receive(on: DispatchQueue.main)
