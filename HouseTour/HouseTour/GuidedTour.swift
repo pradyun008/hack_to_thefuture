@@ -1,100 +1,247 @@
 import CoreGraphics
 import Foundation
 
-/// Mode 1: the app walks a preset path from the front door, narrating like a
-/// realtor. It moves the avatar directly (not through trackpad input), and the
-/// Explorer fires the same doorways and floor textures the user will meet when
-/// exploring alone.
+/// Mode 1: a tour the user walks themselves. house.tour is split into
+/// checkpoints, one per narrated stop; the unnarrated points before a stop only
+/// set which way you face when you jump there. The app says where the next
+/// stop is, relative to the way you're facing, and plays a stop's narration
+/// only once the avatar actually gets there. You can wander anywhere (walls
+/// still block); the directions come back if you walk for a while without
+/// getting closer.
 final class GuidedTour {
+    struct Checkpoint {
+        let floor: Int
+        let point: CGPoint
+        let say: String
+        let name: String      // room name, for the guidance and the "Jump to room" menu
+        let room: Int?        // reaching this room counts as arriving
+        let stairs: Bool      // the stop before a climb; stepping onto the stairs counts
+        let heading: Double   // facing along the tour path, for jumps
+    }
+
+    let checkpoints: [Checkpoint]
     private let explorer: Explorer
     private let speech: Speaker
-    private let steps: [TourStep]
-    private var index = 0
-    private var walker = CGPoint.zero
-    private var waiting = false
+    private(set) var running = false
+    private var target = 0          // checkpoint being walked to
+    private var reached: Int?       // checkpoint last narrated
+    private var narrating = false
+    private var run = 0             // bumps on every restart so a stale narration can't advance a new one
     private var timer: Timer?
-    private var lastTick = Date()
-    private var run = 0   // bumps on start/stop so a stale pause can't resume a new tour
+    private var lastFloor = 0
+    private var lastPosition = CGPoint.zero
+    private var lastMoved = Date.distantPast
+    private var lastGuidance = Date.distantPast
+    private var distanceAtGuidance = Double.infinity
     var onFinish: (() -> Void)?
 
-    static let speed = 3.0   // ft/s; slower than walking pace so there's time to feel things
+    static let reach = 2.5      // ft from a checkpoint that counts as there
+    static let regreet = 10.0   // s of walking without getting 3 ft closer before directions repeat
 
     init(explorer: Explorer, speech: Speaker) {
         self.explorer = explorer
         self.speech = speech
-        steps = explorer.house.tour
+        checkpoints = Self.checkpoints(explorer.house)
+        explorer.shouldAnnounceRoom = { [weak self] room in
+            guard let self, self.running, self.target < self.checkpoints.count else { return true }
+            let cp = self.checkpoints[self.target]
+            return !(cp.floor == self.explorer.floorIndex && cp.room == room)
+        }
     }
 
-    func start() {
-        guard let first = steps.first else { return }
-        stop(silently: true)
-        run += 1
-        index = 0
-        walker = first.point
-        explorer.beginTour(at: walker, floor: first.floor)
-        lastTick = Date()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] _ in self?.tick() }
-        arrive(at: first)
+    private static func checkpoints(_ house: House) -> [Checkpoint] {
+        var result: [Checkpoint] = []
+        for (i, step) in house.tour.enumerated() {
+            guard let say = step.say else { continue }
+            let floor = house.floors[step.floor]
+            let stairs = i + 1 < house.tour.count && house.tour[i + 1].climb == true
+            let room = stairs ? floor.stairsIndex : floor.roomIndex(at: step.point)
+            let before = i > 0 ? house.tour[i - 1] : nil
+            let heading = before.map { $0.floor == step.floor ? bearing(from: $0.point, to: step.point) : house.entranceHeading }
+                ?? house.entranceHeading
+            result.append(Checkpoint(floor: step.floor, point: step.point, say: say,
+                                     name: room.map { floor.rooms[$0].name } ?? "Outside",
+                                     room: room, stairs: stairs, heading: heading))
+        }
+        return result
+    }
+
+    // MARK: Controls
+
+    /// `preface` is said first, as part of the same narration so nothing cuts it off.
+    func start(preface: String? = nil) {
+        let intro = "Guided tour. You walk it yourself: drag to move, and you'll hear where to go next. Single tap repeats the directions."
+        jump(to: 0, intro: [preface, intro].compactMap { $0 }.joined(separator: " "))
+    }
+
+    func restart() {
+        jump(to: 0, intro: "Restarting the tour.")
+    }
+
+    /// Puts the avatar at a checkpoint and narrates it right away.
+    func jump(to index: Int, intro: String? = nil) {
+        guard checkpoints.indices.contains(index) else { return }
+        begin()
+        let cp = checkpoints[index]
+        explorer.teleport(to: cp.point, floor: cp.floor, heading: cp.heading)
+        lastFloor = cp.floor
+        target = index
+        arrive(intro: intro ?? "Jumped to \(cp.name).")
+    }
+
+    /// Aims back at the stop before the one you last reached, and guides you
+    /// there from where you stand. Pressing again goes back one more.
+    func previous() {
+        guard running else { return }
+        restartRun()
+        target = max((reached ?? target) - 1, 0)
+        reached = nil
+        let back = "Going back to \(checkpoints[target].name)."
+        if isAtTarget() { arrive(intro: back) } else { guide(prefix: back + " ") }
     }
 
     func stop(silently: Bool = false) {
-        guard timer != nil else { return }
+        guard running else { return }
+        running = false
+        narrating = false
+        run += 1
         timer?.invalidate()
         timer = nil
-        waiting = false
-        run += 1
-        explorer.endTour()
-        if !silently { speech.say("Tour stopped.", interrupt: true) }
+        speech.stop()
+        if !silently { speech.say("Tour stopped. Explore on your own.", interrupt: true) }
     }
 
+    /// Single tap during the tour: the room you're in and the way to the next stop.
+    func repeatGuidance() {
+        guard running, !narrating, target < checkpoints.count else { return }
+        if speech.request(explorer.roomLabel + ". " + guidance()) { noteGuidance() }
+    }
+
+    // MARK: Walking
+
+    /// The explorer calls this after every move, room change, and floor change.
+    func update() {
+        guard running, !narrating, target < checkpoints.count else { return }
+        let p = explorer.position
+        if p.distance(to: lastPosition) > 0.05 {
+            lastPosition = p
+            lastMoved = Date()
+        }
+        if isAtTarget() { return arrive() }
+        if explorer.floorIndex != lastFloor { guide() }
+    }
+
+    /// Repeats the directions while the user walks without getting closer.
     private func tick() {
+        guard running, !narrating, target < checkpoints.count else { return }
         let now = Date()
-        let dt = now.timeIntervalSince(lastTick)
-        lastTick = now
-        guard !waiting else { return }
-        guard index < steps.count else { return finish() }
-        let target = steps[index]
-        let d = walker.distance(to: target.point)
-        let move = Self.speed * dt
-        if d <= move {
-            walker = target.point
-            explorer.walk(to: walker)
-            arrive(at: target)
-        } else {
-            walker = CGPoint(x: walker.x + (target.x - walker.x) * move / d,
-                             y: walker.y + (target.y - walker.y) * move / d)
-            explorer.walk(to: walker)
+        guard now.timeIntervalSince(lastMoved) < 1.5, now.timeIntervalSince(lastGuidance) >= Self.regreet else { return }
+        let d = distanceToTarget()
+        if d < distanceAtGuidance - 3 {
+            // Getting there. Start the clock again instead of talking.
+            distanceAtGuidance = d
+            lastGuidance = now
+            return
         }
+        guard !speech.isSpeaking else { return }
+        guide()
     }
 
-    private func arrive(at step: TourStep) {
-        index += 1
-        if step.climb == true {
-            explorer.changeFloor(viaStairs: true)
-            pause(for: 1.0)
-        } else if let say = step.say {
-            waiting = true
-            let current = run
-            speech.say(say, interrupt: true) { [weak self] in
-                if self?.run == current { self?.pause(for: 0.4) }
-            }
-        }
+    private func begin() {
+        restartRun()
+        running = true
+        lastPosition = explorer.position
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.tick() }
     }
 
-    private func pause(for seconds: Double) {
-        waiting = true
+    /// Cuts off whatever was being said and invalidates its completion.
+    private func restartRun() {
+        run += 1
+        narrating = false
+        speech.stop()
+    }
+
+    private func isAtTarget() -> Bool {
+        let cp = checkpoints[target]
+        guard explorer.floorIndex == cp.floor else { return false }
+        if explorer.position.distance(to: cp.point) <= Self.reach { return true }
+        if cp.stairs { return explorer.isOnStairs }
+        // Walking into the stop's room counts, unless the stop before was in the same room.
+        guard let room = cp.room, explorer.currentRoom == room else { return false }
+        return target == 0 || checkpoints[target - 1].room != room || checkpoints[target - 1].floor != cp.floor
+    }
+
+    /// Plays the stop's narration, then points to the next one. Narration is
+    /// protected, so nothing the user taps cuts it off.
+    private func arrive(intro: String? = nil) {
+        let cp = checkpoints[target]
+        narrating = true
+        reached = target
         let current = run
-        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
-            guard self?.run == current else { return }
-            self?.waiting = false
-            self?.lastTick = Date()
+        let text = [intro, cp.say].compactMap { $0 }.joined(separator: " ")
+        speech.say(text, interrupt: true, narration: true) { [weak self] in
+            guard let self, self.run == current else { return }
+            self.narrating = false
+            self.advance()
         }
+    }
+
+    private func advance() {
+        target = (reached ?? target) + 1
+        guard target < checkpoints.count else { return finish() }
+        if isAtTarget() { arrive() } else { guide() }
+    }
+
+    // MARK: Directions
+
+    private func guide(prefix: String = "") {
+        speech.say(prefix + guidance())
+        noteGuidance()
+    }
+
+    private func noteGuidance() {
+        lastGuidance = Date()
+        distanceAtGuidance = distanceToTarget()
+        lastFloor = explorer.floorIndex
+    }
+
+    /// "Next stop, Kitchen. Go through the door to Kitchen, on your left, about 3 steps."
+    /// On the wrong floor, it leads to the stairs instead.
+    private func guidance() -> String {
+        let cp = checkpoints[target]
+        var text = "Next stop, \(cp.name)."
+        guard explorer.floorIndex == cp.floor else {
+            let up = cp.floor > explorer.floorIndex
+            text += up ? " It's upstairs." : " It's downstairs."
+            if explorer.isOnStairs {
+                text += up ? " Hold still on the stairs to climb." : " Hold still on the stairs to go down."
+            } else if let s = explorer.floor.stairsIndex {
+                text += " Head for the stairs. " + explorer.route(to: stairsSpot(s), room: s)
+            }
+            return text
+        }
+        return text + " " + explorer.route(to: cp.point, room: cp.room)
+    }
+
+    /// Where on this floor's stairs to aim for: the part that connects floors.
+    private func stairsSpot(_ s: Int) -> CGPoint {
+        if let landing = explorer.house.stairLanding { return landing }
+        let r = explorer.floor.rooms[s].rect
+        return CGPoint(x: r.midX, y: r.midY)
+    }
+
+    private func distanceToTarget() -> Double {
+        let cp = checkpoints[target]
+        if explorer.floorIndex == cp.floor { return explorer.position.distance(to: cp.point) }
+        return explorer.floor.stairsIndex.map { explorer.position.distance(to: stairsSpot($0)) } ?? 0
     }
 
     private func finish() {
+        running = false
         timer?.invalidate()
         timer = nil
-        explorer.endTour()
+        speech.say("That's the end of the tour. Explore on your own. Double tap describes what's around you, and a triple tap points you to the front door.")
         onFinish?()
     }
 }

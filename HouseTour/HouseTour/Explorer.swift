@@ -10,25 +10,39 @@ final class Explorer: ObservableObject {
     @Published private(set) var floorIndex = 0
     @Published private(set) var position: CGPoint
     @Published private(set) var roomName = ""
+    /// The way the avatar faces, in radians (0 = up the screen, clockwise). The
+    /// trackpad turns with it: finger up walks ahead, finger right walks to your
+    /// right. It holds still while the finger is down, so a sideways drag can't
+    /// spin you, and on lift turns to the way you walked (unless you backed up).
+    @Published private(set) var heading: Double {
+        didSet { audio.face(heading) }
+    }
 
     let house: House
     private let haptics: Haptics
     private let audio: SpatialAudio
     private let speech: Speaker
 
-    /// True during the guided tour, which narrates rooms itself.
-    private(set) var narrating = false
+    /// Called after every move, room change, and floor change. The guided tour
+    /// watches it for checkpoint arrivals.
+    var onUpdate: (() -> Void)?
+    /// Asked before a room's name is spoken on entry. The tour says no for the
+    /// room it's about to narrate, so the name isn't said twice.
+    var shouldAnnounceRoom: ((Int?) -> Bool)?
 
     var floor: Floor { house.floors[floorIndex] }
 
+    private(set) var currentRoom: Int?    // room last announced; nil = outside
     private var touching = false
     private var lastLabel: Int?      // room under the avatar
-    private var currentRoom: Int?    // room last announced; nil = outside
     private var pending: (room: Int?, since: Date, origin: CGPoint)?
     private var strideDistance = 0.0
+    private var trail: [CGPoint] = []  // recent path, newest last, for the heading
+    private var travelHeading: Double?  // way this drag walked, applied on lift
     private var atDoors = Set<Int>()  // doors already announced on this arrival
     private var contact: [CellKind?] = [nil, nil]   // what each axis (x, y) last bumped
     private var lastHit = [Date.distantPast, Date.distantPast]
+    private var lastKnock = Date.distantPast
     private var currentFixture: String?
     private var stairsHold: (since: Date, origin: CGPoint)?
     private var stairsArmed = true
@@ -39,6 +53,8 @@ final class Explorer: ObservableObject {
     static let warningZone = 1.5     // ft from a wall where the hum starts
     static let doorReach = 1.0       // ft from a door's opening that counts as "at the door"
     static let doorRearm = 2.0       // ft away before the same door is announced again
+    static let headingWindow = 1.5   // ft of travel the heading is taken over
+    static let knockRepeat = 0.3     // s between knocks while pushing into a wall
 
     init(house: House, haptics: Haptics, audio: SpatialAudio, speech: Speaker) {
         self.house = house
@@ -46,13 +62,21 @@ final class Explorer: ObservableObject {
         self.audio = audio
         self.speech = speech
         position = house.entrance
+        heading = house.entranceHeading
         floorIndex = house.frontDoor.floor
         let start = house.floors[house.frontDoor.floor]
         lastLabel = start.roomIndex(at: house.entrance)
         currentRoom = lastLabel
         roomName = currentRoom.map { start.rooms[$0].name } ?? "Outside"
+        trail = [house.entrance]
         audio.moveListener(to: house.entrance)
+        audio.face(heading)
     }
+
+    var isOnStairs: Bool { currentRoom.map { floor.rooms[$0].isStairs } ?? false }
+
+    /// The room's name, or "Outside the house".
+    var roomLabel: String { currentRoom.map { floor.rooms[$0].name } ?? "Outside the house" }
 
     // MARK: Input
 
@@ -60,6 +84,8 @@ final class Explorer: ObservableObject {
     /// that run while touching.
     func touchDown() {
         touching = true
+        trail = [position]
+        travelHeading = nil
         updateBeacon()
         audio.setWind(Setting.wind.isOn && currentRoom == nil)
         stairsHold = nil
@@ -67,17 +93,20 @@ final class Explorer: ObservableObject {
         startTimer()
     }
 
-    /// Trackpad input: move by `delta` feet, stopping at walls.
+    /// Trackpad input: move by `delta` feet, stopping at walls. `delta` is in
+    /// screen terms (up is -y) and gets turned to the heading, so up is ahead.
     func drag(by delta: CGVector) {
-        guard touching, !narrating else { return }
-        let move = floor.slide(from: position, by: delta)
-        bump(x: move.hitX, y: move.hitY, at: move.end)
+        guard touching else { return }
+        let s = sin(heading), c = cos(heading)
+        let step = CGVector(dx: delta.dx * c - delta.dy * s, dy: delta.dx * s + delta.dy * c)
+        let move = floor.slide(from: position, by: step)
+        bump(x: move.hitX, y: move.hitY, pushing: step, at: move.end)
         walk(to: move.end)
     }
 
     /// Moves the avatar along a straight, already-clear line and fires whatever it
-    /// passes. The guided tour calls this directly; its path never crosses a wall.
-    func walk(to p: CGPoint) {
+    /// passes.
+    private func walk(to p: CGPoint) {
         let prev = position
         let d = prev.distance(to: p)
         guard d > 0.001 else { return }
@@ -89,6 +118,7 @@ final class Explorer: ObservableObject {
         }
         position = p
         audio.moveListener(to: p)
+        updateHeading(p)
         strideDistance += d
         if strideDistance >= Self.stride {
             strideDistance = 0
@@ -98,6 +128,7 @@ final class Explorer: ObservableObject {
         checkDoors(p)
         checkFixture(p)
         checkPending(p)
+        onUpdate?()
     }
 
     func touchUp() {
@@ -106,6 +137,15 @@ final class Explorer: ObservableObject {
             commit(pend.room)
         }
         touching = false
+        // Face the way you walked. Backing up keeps your heading, the way a
+        // person stepping back still faces forward.
+        if let h = travelHeading {
+            var turn = (h - heading).truncatingRemainder(dividingBy: 2 * .pi)
+            if turn > .pi { turn -= 2 * .pi }
+            if turn < -.pi { turn += 2 * .pi }
+            if abs(turn) <= .pi * 3 / 4 { heading = h }
+        }
+        travelHeading = nil
         pending = nil
         stairsHold = nil
         timer?.invalidate()
@@ -113,16 +153,17 @@ final class Explorer: ObservableObject {
         haptics.proximity(0)
         updateBeacon()
         audio.setWind(false)
+        onUpdate?()
     }
 
     // MARK: Queries
 
     /// Short location, said on a single tap.
     func announceLocation() {
-        speech.say((currentRoom.map { floor.rooms[$0].name } ?? "Outside the house") + ".", interrupt: true)
+        speech.request(roomLabel + ".")
     }
 
-    /// "First floor, Kitchen. Near the wall ahead. Tile. The front door is behind you on your left, about 9 steps."
+    /// "First floor, Kitchen. Near the wall on your left. Tile. The front door is behind you on your left, about 9 steps."
     /// Interior doors are left out on purpose: they're announced when you reach them.
     func whereAmI() {
         let p = position
@@ -135,21 +176,51 @@ final class Explorer: ObservableObject {
             parts = ["\(floor.name), outside the house"]
         }
         parts.append(frontDoorHint(from: p))
-        speech.say(parts.joined(separator: ". ") + ".", interrupt: true)
+        speech.request(parts.joined(separator: ". ") + ".")
+    }
+
+    /// Double tap: what's around you. The room and floor, the nearest doors and
+    /// where they go, the nearest built-in, and the front door.
+    /// "Kitchen, first floor. The opening to Dining area is on your right, about 2 steps. The front door is behind you, about 7 steps."
+    func describeSurroundings() {
+        let p = position
+        var parts = [currentRoom.map { "\(floor.rooms[$0].name), \(floor.name.lowercased())" }
+                     ?? "Outside the house, \(floor.name.lowercased())"]
+        for i in nearbyDoors(p) {
+            let spot = floor.nearestPoint(onDoor: i, from: p)
+            parts.append("\(theDoor(floor.doors[i])) is \(place(from: p, to: spot, heading: heading))")
+        }
+        if let landmark = nearestLandmark(p) { parts.append(landmark) }
+        parts.append(frontDoorHint(from: p))
+        speech.request(parts.joined(separator: ". ") + ".")
     }
 
     /// The reset button for when someone is lost. Points the way and plays the
     /// beacon loudly for a few seconds, even if the beacon is switched off.
+    /// Dropped entirely while something is being said.
     func findFrontDoor() {
-        haptics.frontDoor()
         let p = position
         let sameFloor = floorIndex == house.frontDoor.floor
-        speech.say(frontDoorHint(from: p) + (sameFloor ? ". Follow the chime." : "."), interrupt: true)
+        guard speech.request(frontDoorHint(from: p) + (sameFloor ? ". Follow the chime." : ".")) else { return }
+        haptics.frontDoor()
         guard sameFloor else { return }
         beaconBoostUntil = Date().addingTimeInterval(6)
         updateBeacon()
         audio.boostBeacon()
         DispatchQueue.main.asyncAfter(deadline: .now() + 6.1) { [weak self] in self?.updateBeacon() }
+    }
+
+    /// How to get to `target` in room `room` on this floor: through the first
+    /// door on the way when it's in another room, otherwise straight there.
+    /// "Go through the door to Kitchen, on your left, about 3 steps."
+    func route(to target: CGPoint, room: Int?) -> String {
+        let p = position
+        if let here = currentRoom ?? lastLabel, let goal = room, let i = floor.firstDoor(from: here, to: goal) {
+            let spot = floor.nearestPoint(onDoor: i, from: p)
+            let door = theDoor(floor.doors[i], from: here)
+            return "Go through \(door.prefix(1).lowercased() + door.dropFirst()), \(place(from: p, to: spot, heading: heading))."
+        }
+        return "It's \(place(from: p, to: target, heading: heading))."
     }
 
     /// Switch storeys. On the stairs the avatar keeps its spot (the floors are
@@ -164,6 +235,7 @@ final class Explorer: ObservableObject {
             position = landing
             audio.moveListener(to: landing)
         }
+        trail = [position]
         stairsArmed = false
         stairsHold = nil
         pending = nil
@@ -174,22 +246,25 @@ final class Explorer: ObservableObject {
         lastLabel = floor.roomIndex(at: p)
         setRoom(lastLabel)
         updateBeacon()
-        guard !narrating else { return }
         var text = floor.name + "."
         if let room = currentRoom, floor.rooms[room].isStairs {
             text += " You're on the stairs."
         } else {
             text += " " + roomSentence(currentRoom)
         }
-        speech.say(text, interrupt: true)
+        // Climbing is movement, so it can cut off stale speech. The button waits
+        // its turn: buttons never interrupt.
+        speech.say(text, interrupt: viaStairs)
+        onUpdate?()
     }
 
-    // MARK: Guided tour hooks
-
-    func beginTour(at p: CGPoint, floor index: Int) {
-        narrating = true
+    /// Puts the avatar somewhere directly, for the tour's restart and jump.
+    /// Says nothing; the tour narrates.
+    func teleport(to p: CGPoint, floor index: Int, heading: Double) {
         if floorIndex != index { floorIndex = index }
         position = p
+        self.heading = heading
+        trail = [p]
         audio.moveListener(to: p)
         lastLabel = floor.roomIndex(at: p)
         setRoom(lastLabel)
@@ -197,33 +272,66 @@ final class Explorer: ObservableObject {
         strideDistance = 0
         atDoors = doorsInReach(p)
         currentFixture = floor.fixture(at: p)?.name
-        touchDown()
-    }
-
-    func endTour() {
-        narrating = false
-        touchUp()
+        contact = [nil, nil]
+        stairsHold = nil
+        stairsArmed = false
+        updateBeacon()
     }
 
     // MARK: Event detection
 
-    /// One knock per contact. Pushing into the same wall stays quiet; an axis
-    /// re-arms once the avatar is 0.5 ft clear of walls or hasn't touched one for
-    /// 0.6 s. Hitting a corner while sliding is a new axis, so it knocks.
-    private func bump(x: CellKind?, y: CellKind?, at p: CGPoint) {
+    /// The first knock of a contact says what you hit (and its name, if that's
+    /// switched on). Pushing on keeps knocking about three times a second so
+    /// you can tell you're still against it; the name isn't repeated. An axis
+    /// counts as a new contact once the avatar is 0.5 ft clear of walls or
+    /// hasn't touched one for 0.6 s. Grazing a wall while sliding along it at a
+    /// shallow angle doesn't repeat.
+    private func bump(x: CellKind?, y: CellKind?, pushing delta: CGVector, at p: CGPoint) {
         let now = Date()
         let clear = floor.distanceToBlocking(from: p, within: 0.5) == nil
-        var fired: CellKind?
+        let push = [abs(delta.dx), abs(delta.dy)]
+        let total = hypot(delta.dx, delta.dy)
+        var fresh: CellKind?, pressing: CellKind?
         for (axis, hit) in [x, y].enumerated() {
             if clear || now.timeIntervalSince(lastHit[axis]) > 0.6 { contact[axis] = nil }
             guard let hit else { continue }
             lastHit[axis] = now
-            if contact[axis] != hit, fired == nil { fired = hit }
+            if contact[axis] != hit, fresh == nil { fresh = hit }
             contact[axis] = hit
+            // At least half the push goes into the wall, not along it.
+            if push[axis] >= total * 0.5, pressing == nil { pressing = hit }
         }
-        guard let fired else { return }
-        haptics.blocked(fired)
-        if fired != .wall, Setting.speakObstacles.isOn { speech.say(blockedName(fired) + ".", dedupe: 4) }
+        if let fresh {
+            haptics.blocked(fresh)
+            lastKnock = now
+            // Not over tour narration, and never queued behind it: by then it's stale.
+            if fresh != .wall, Setting.speakObstacles.isOn, !speech.isNarrating {
+                speech.say(blockedName(fresh) + ".", dedupe: 4)
+            }
+        } else if let pressing, now.timeIntervalSince(lastKnock) >= Self.knockRepeat {
+            haptics.blocked(pressing)
+            lastKnock = now
+        }
+    }
+
+    /// The way you walked is the direction from where the avatar was 1.5 ft of
+    /// walking ago to where it is now. Jiggling back and forth covers distance
+    /// without going anywhere, so it only counts when that line is long enough.
+    /// It's held until lift: turning mid-drag would turn the trackpad under the
+    /// finger and walk you in circles.
+    private func updateHeading(_ p: CGPoint) {
+        if let last = trail.last, last.distance(to: p) < 0.1 { return }
+        trail.append(p)
+        var length = 0.0
+        var oldest = trail.count - 1
+        while oldest > 0, length < Self.headingWindow {
+            length += trail[oldest].distance(to: trail[oldest - 1])
+            oldest -= 1
+        }
+        trail.removeFirst(oldest)
+        guard length >= Self.headingWindow, let tail = trail.first,
+              tail.distance(to: p) >= Self.headingWindow * 0.6 else { return }
+        travelHeading = bearing(from: tail, to: p)
     }
 
     private func sample(_ q: CGPoint) {
@@ -252,7 +360,10 @@ final class Explorer: ObservableObject {
         setRoom(room)
         // Queue behind a door name said a moment ago instead of cutting it off.
         let doorJustSpoken = Date().timeIntervalSince(lastDoorSpeech) < 1.5
-        if !narrating, Setting.speakRooms.isOn { speech.say(roomSentence(room), interrupt: !doorJustSpoken, dedupe: 2) }
+        // Not over tour narration: queued behind it, the name would be stale.
+        if Setting.speakRooms.isOn, !speech.isNarrating, shouldAnnounceRoom?(room) ?? true {
+            speech.say(roomSentence(room), interrupt: !doorJustSpoken, dedupe: 2)
+        }
     }
 
     private var lastDoorSpeech = Date.distantPast
@@ -298,8 +409,8 @@ final class Explorer: ObservableObject {
         } else {
             haptics.doorway()
         }
-        if !narrating, Setting.speakDoors.isOn {
-            speech.say(doorName(door))
+        if Setting.speakDoors.isOn, !speech.isNarrating {
+            speech.say(doorName(door, from: lastLabel ?? currentRoom))
             lastDoorSpeech = Date()
         }
     }
@@ -310,15 +421,15 @@ final class Explorer: ObservableObject {
         currentFixture = name
         if let name {
             haptics.fixture()
-            if !narrating, Setting.speakObstacles.isOn { speech.say(name + ".", dedupe: 3) }
+            if Setting.speakObstacles.isOn, !speech.isNarrating { speech.say(name + ".", dedupe: 3) }
         }
     }
 
     /// Holding still on the stairs for 1.2 s, finger down, climbs (or descends) them.
     private func checkStairsHold() {
-        guard touching, !narrating else { return }
+        guard touching else { return }
         let p = position
-        guard currentRoom.map({ floor.rooms[$0].isStairs }) ?? false else {
+        guard isOnStairs else {
             stairsArmed = true
             stairsHold = nil
             return
@@ -344,8 +455,7 @@ final class Explorer: ObservableObject {
     }
 
     private func updateProximity(_ p: CGPoint) {
-        // The tour walks hallways; a constant hum there is just noise.
-        guard touching, !narrating, Setting.wallHum.isOn,
+        guard touching, Setting.wallHum.isOn,
               let d = floor.distanceToBlocking(from: p, within: Self.warningZone) else {
             return haptics.proximity(0)
         }
@@ -363,7 +473,10 @@ final class Explorer: ObservableObject {
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self else { return }
+            // Settling into a room while holding still is still an arrival the tour must see.
+            let room = self.currentRoom
             self.checkPending(self.position)
+            if self.currentRoom != room { self.onUpdate?() }
             self.checkStairsHold()
         }
     }
@@ -386,7 +499,8 @@ final class Explorer: ObservableObject {
     /// "Follow them on your left, about 3 steps, then hold still."
     private func stairsGuide(from p: CGPoint) -> String {
         guard let target = house.stairLanding else { return "Hold still to change floors." }
-        return "Follow them \(relativeDirection(from: p, to: target)), about \(steps(p.distance(to: target))), then hold still."
+        guard p.distance(to: target) >= 1.5 else { return "Hold still right here." }
+        return "Follow them \(place(from: p, to: target, heading: heading)), then hold still."
     }
 
     private func blockedName(_ k: CellKind) -> String {
@@ -402,33 +516,78 @@ final class Explorer: ObservableObject {
 
     /// "Door to Kitchen", "Opening to Dining area", "Front door". Names the side
     /// you're not on.
-    private func doorName(_ door: Door) -> String {
+    private func doorName(_ door: Door, from here: Int?) -> String {
         if let name = door.name { return name }
-        let here = lastLabel ?? currentRoom
         let other = door.a == here ? door.b : door.a
         let otherName = other >= 0 ? floor.rooms[other].name : "outside"
         return "\(door.kind == "opening" ? "Opening" : "Door") to \(otherName)"
     }
 
+    /// "The door to Kitchen", "The garage side door".
+    private func theDoor(_ door: Door, from here: Int? = nil) -> String {
+        let name = doorName(door, from: here ?? currentRoom)
+        return "The " + name.prefix(1).lowercased() + name.dropFirst()
+    }
+
+    /// The doors out of the room you're in, nearest first: the closest one, plus
+    /// a second if it's within 10 ft. Closets only when there's nothing else.
+    /// The front door is left out; it always gets its own sentence.
+    private func nearbyDoors(_ p: CGPoint) -> [Int] {
+        let here = currentRoom ?? -1
+        let isCloset = { (i: Int) -> Bool in
+            let d = self.floor.doors[i]
+            let other = d.a == here ? d.b : d.a
+            return other >= 0 && self.floor.rooms[other].isCloset
+        }
+        let doors = floor.doors.indices
+            .filter { (floor.doors[$0].a == here || floor.doors[$0].b == here) && !floor.doors[$0].isFront }
+            .sorted { floor.distance(toDoor: $0, from: p) < floor.distance(toDoor: $1, from: p) }
+        let main = doors.filter { !isCloset($0) }
+        guard let first = main.first else { return Array(doors.prefix(1)) }
+        if main.count > 1, floor.distance(toDoor: main[1], from: p) <= 10 { return [first, main[1]] }
+        return [first]
+    }
+
+    /// The nearest built-in or the stairs, within 30 ft. "The fireplace is ahead, about 4 steps."
+    private func nearestLandmark(_ p: CGPoint) -> String? {
+        var marks = floor.fixtures.map { ("The " + $0.name.lowercased() + " is", $0.cgRect) }
+        if !isOnStairs, let s = floor.stairsIndex { marks.append(("The stairs are", floor.rooms[s].rect)) }
+        let nearest = marks
+            .map { mark in (mark.0, p.clamped(to: mark.1)) }
+            .min { p.distance(to: $0.1) < p.distance(to: $1.1) }
+        guard let nearest, p.distance(to: nearest.1) <= 30 else { return nil }
+        return "\(nearest.0) \(place(from: p, to: nearest.1, heading: heading))"
+    }
+
+    /// Always names the front door, never just "the door".
     private func frontDoorHint(from p: CGPoint) -> String {
         let door = house.frontDoor
         guard floorIndex == door.floor else {
-            guard let s = floor.stairsIndex else { return "The front door is downstairs" }
+            let side = floorIndex > door.floor ? "downstairs" : "upstairs"
+            if isOnStairs { return "The front door is \(side). You're on the stairs" }
+            guard let s = floor.stairsIndex else { return "The front door is \(side)" }
             let r = floor.rooms[s].rect
             let c = CGPoint(x: r.midX, y: r.midY)
-            return "The front door is downstairs. The stairs are \(relativeDirection(from: p, to: c)), about \(steps(p.distance(to: c)))"
+            return "The front door is \(side). The stairs are \(place(from: p, to: c, heading: heading))"
         }
-        return "The front door is \(relativeDirection(from: p, to: door.point)), about \(steps(p.distance(to: door.point)))"
+        return "The front door is \(place(from: p, to: door.point, heading: heading))"
     }
 
+    /// "Near the wall on your left", turned to the way you're facing.
     private func wallHint(_ p: CGPoint, in r: CGRect) -> String {
-        let gaps = [
-            ("Near the wall ahead", p.y - r.minY),
-            ("Near the wall behind you", r.maxY - p.y),
-            ("Near the left wall", p.x - r.minX),
-            ("Near the right wall", r.maxX - p.x),
+        let walls = [
+            CGPoint(x: p.x, y: r.minY), CGPoint(x: p.x, y: r.maxY),
+            CGPoint(x: r.minX, y: p.y), CGPoint(x: r.maxX, y: p.y),
         ]
-        let closest = gaps.min { $0.1 < $1.1 }!
-        return closest.1 < 2.5 ? closest.0 : "In the middle of the room"
+        let nearest = walls.min { p.distance(to: $0) < p.distance(to: $1) }!
+        guard p.distance(to: nearest) < 2.5 else { return "In the middle of the room" }
+        return "Near the wall " + relativeSide(from: p, to: nearest, heading: heading)
+    }
+}
+
+extension CGPoint {
+    /// The closest point inside `r`.
+    fileprivate func clamped(to r: CGRect) -> CGPoint {
+        CGPoint(x: min(max(x, r.minX), r.maxX), y: min(max(y, r.minY), r.maxY))
     }
 }

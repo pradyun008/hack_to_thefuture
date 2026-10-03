@@ -131,11 +131,16 @@ final class Floor {
 
     /// Feet from `p` to the nearest point of door `i`'s opening.
     func distance(toDoor i: Int, from p: CGPoint) -> Double {
+        p.distance(to: nearestPoint(onDoor: i, from: p))
+    }
+
+    /// The point of door `i`'s opening closest to `p`.
+    func nearestPoint(onDoor i: Int, from p: CGPoint) -> CGPoint {
         let (a, b) = doorSpans[i]
         let dx = b.x - a.x, dy = b.y - a.y
         let len2 = dx * dx + dy * dy
         let t = len2 > 0 ? max(0, min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0
-        return p.distance(to: CGPoint(x: a.x + t * dx, y: a.y + t * dy))
+        return CGPoint(x: a.x + t * dx, y: a.y + t * dy)
     }
 
     private func index(_ p: CGPoint) -> Int? {
@@ -212,6 +217,26 @@ final class Floor {
     func isStairs(at p: CGPoint) -> Bool {
         roomIndex(at: p).map { rooms[$0].isStairs } ?? false
     }
+
+    /// The first door to go through on the way from room `start` to room `goal`,
+    /// fewest doors first. Nil when they're the same room or not connected.
+    func firstDoor(from start: Int, to goal: Int) -> Int? {
+        guard start != goal else { return nil }
+        var firstDoorTo = [start: -1]   // room -> door taken out of `start` to get there
+        var queue = [start]
+        while !queue.isEmpty {
+            let room = queue.removeFirst()
+            for (i, door) in doors.enumerated() where door.a == room || door.b == room {
+                let next = door.a == room ? door.b : door.a
+                guard next >= 0, firstDoorTo[next] == nil else { continue }
+                let first = firstDoorTo[room] == -1 ? i : firstDoorTo[room]!
+                if next == goal { return first }
+                firstDoorTo[next] = first
+                queue.append(next)
+            }
+        }
+        return nil
+    }
 }
 
 struct RawFloor: Decodable {
@@ -257,6 +282,11 @@ final class House {
     /// user learns is the one landmark they can always ask for again.
     let entrance: CGPoint
 
+    /// Facing into the house, away from the front door, as if just walked in.
+    var entranceHeading: Double {
+        entrance.distance(to: frontDoor.point) > 0.1 ? bearing(from: frontDoor.point, to: entrance) : 0
+    }
+
     /// Steps from the front door toward the middle of the room it opens into until
     /// the walker is on open floor in that room, at least 1.5 ft in.
     private static func inside(_ front: FrontDoor, _ floors: [Floor]) -> CGPoint {
@@ -298,9 +328,36 @@ final class House {
         return n > 0 ? CGPoint(x: sx / n, y: sy / n) : nil
     }
 
-    static func bundled() -> House {
-        let url = Bundle.main.url(forResource: "house", withExtension: "json")!
-        return try! House(data: Data(contentsOf: url))
+    static func bundled(_ demo: DemoHouse) -> House {
+        try! House(data: demo.json)
+    }
+}
+
+/// The houses bundled with the app. Settings picks which one you explore.
+enum DemoHouse: String, CaseIterable, Identifiable {
+    case odonnell = "house"
+    case waterville
+
+    /// UserDefaults key for the chosen house.
+    static let key = "demoHouse"
+
+    static var current: DemoHouse {
+        UserDefaults.standard.string(forKey: key).flatMap(DemoHouse.init) ?? .odonnell
+    }
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .odonnell: "2011 O'Donnell Dr, Champaign"
+        case .waterville: "Waterville demo house"
+        }
+    }
+
+    /// The house file, also served as-is to the laptop viewer.
+    var json: Data {
+        let url = Bundle.main.url(forResource: rawValue, withExtension: "json")!
+        return (try? Data(contentsOf: url)) ?? Data()
     }
 }
 
@@ -308,13 +365,19 @@ extension CGPoint {
     func distance(to o: CGPoint) -> Double { hypot(x - o.x, y - o.y) }
 }
 
-/// Where `target` is relative to someone at `from` facing up the screen (toward
-/// the back of the house). Up is always "ahead" so the phone's edges stay a
-/// fixed frame of reference.
-func relativeDirection(from: CGPoint, to target: CGPoint) -> String {
-    let dx = target.x - from.x, dy = target.y - from.y
-    if hypot(dx, dy) < 1.5 { return "right here" }
-    let angle = atan2(dx, -dy) * 180 / .pi   // 0 = ahead, 90 = right
+/// Compass angle of a move, in radians: 0 is up the screen (toward the back of
+/// the house), pi/2 is screen right. Headings use the same angle.
+func bearing(from: CGPoint, to target: CGPoint) -> Double {
+    atan2(target.x - from.x, -(target.y - from.y))
+}
+
+/// Which way `target` is for someone at `from` facing `heading`, ignoring how
+/// far it is. "ahead", "on your left", "behind you on your right", and so on.
+func relativeSide(from: CGPoint, to target: CGPoint, heading: Double) -> String {
+    var angle = (bearing(from: from, to: target) - heading) * 180 / .pi   // 0 = ahead, 90 = right
+    angle = angle.truncatingRemainder(dividingBy: 360)
+    if angle >= 180 { angle -= 360 }
+    if angle < -180 { angle += 360 }
     switch angle {
     case -22.5..<22.5: return "ahead"
     case 22.5..<67.5: return "ahead on your right"
@@ -325,6 +388,19 @@ func relativeDirection(from: CGPoint, to target: CGPoint) -> String {
     case -157.5 ..< -112.5: return "behind you on your left"
     default: return "behind you"
     }
+}
+
+/// Where `target` is relative to someone at `from` facing `heading`, the way
+/// they last walked. Ahead turns with the walker, so "ahead" is always the
+/// direction they were going, not the top of the screen.
+func relativeDirection(from: CGPoint, to target: CGPoint, heading: Double) -> String {
+    from.distance(to: target) < 1.5 ? "right here" : relativeSide(from: from, to: target, heading: heading)
+}
+
+/// "on your left, about 3 steps", or "right here" when it's within reach.
+func place(from: CGPoint, to target: CGPoint, heading: Double) -> String {
+    let side = relativeDirection(from: from, to: target, heading: heading)
+    return side == "right here" ? side : "\(side), about \(steps(from.distance(to: target)))"
 }
 
 /// Feet to footsteps, using a 2.5 ft stride.

@@ -11,7 +11,9 @@ final class LaptopViewer {
         var floor = 0
         var x = 0.0
         var y = 0.0
+        var heading = 0.0  // radians, 0 = up the plan, clockwise
         var room = ""
+        var house = ""     // which house file is loaded; the page refetches it when this changes
         var touring = false
         var said = ""
         var saidAt = 0.0   // seconds since 1970, so the page can fade old lines
@@ -21,11 +23,15 @@ final class LaptopViewer {
     private let queue = DispatchQueue(label: "laptop-viewer")
     private let lock = NSLock()
     private var snapshot = Snapshot()
-    private let houseJSON: Data
+    private var houseJSON = Data()   // guarded by `lock`, like `snapshot`
 
-    init() {
-        let url = Bundle.main.url(forResource: "house", withExtension: "json")!
-        houseJSON = (try? Data(contentsOf: url)) ?? Data()
+    /// Serves `demo`'s house file from now on, and tells open pages to reload it.
+    func show(_ demo: DemoHouse) {
+        let data = demo.json
+        lock.lock()
+        houseJSON = data
+        lock.unlock()
+        update { $0.house = demo.rawValue }
     }
 
     var isRunning: Bool { listener != nil }
@@ -71,7 +77,10 @@ final class LaptopViewer {
             let (body, type): (Data, String)
             switch path {
             case "/house.json":
-                (body, type) = (self.houseJSON, "application/json")
+                self.lock.lock()
+                let json = self.houseJSON
+                self.lock.unlock()
+                (body, type) = (json, "application/json")
             case "/state":
                 self.lock.lock()
                 let current = self.snapshot
@@ -132,7 +141,7 @@ private let viewerPage = #"""
 const colors = { hardwood: "#eecc9e", carpet: "#d6d6f2", tile: "#bde3f2", concrete: "#d1d1d1",
                  deck: "#ccb294", unknown: "#f7f2d9" };
 const cellColors = { "#": "#000", w: "#2f7bf5", s: "#2aa8a8", r: "#f59a23", v: "#999" };
-let house, floors = [], trail = [], lastFloor = -1;
+let house, houseName, floors = [], trail = [], lastFloor = -1;
 const canvas = document.getElementById("map"), ctx = canvas.getContext("2d");
 
 function renderFloor(f) {
@@ -170,13 +179,19 @@ function draw(s) {
   ctx.strokeStyle = "rgba(231, 76, 60, 0.5)"; ctx.lineWidth = 4; ctx.beginPath();
   trail.forEach((p, i) => i ? ctx.lineTo(p.x * ft, p.y * ft) : ctx.moveTo(p.x * ft, p.y * ft));
   ctx.stroke();
+  // The avatar: a body circle with a pointed head on the side it faces.
+  const cx = s.x * ft, cy = s.y * ft, ax = Math.sin(s.heading), ay = -Math.cos(s.heading);
+  const at = (f, a) => [cx + ax * f - ay * a, cy + ay * f + ax * a];
   ctx.fillStyle = "#e74c3c"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(s.x * ft, s.y * ft, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(...at(24, 0)); ctx.lineTo(...at(8, 9)); ctx.lineTo(...at(8, -9)); ctx.closePath();
+  ctx.lineJoin = "round"; ctx.fill(); ctx.stroke();
 }
 
 async function poll() {
   try {
     const s = await (await fetch("/state", { cache: "no-store" })).json();
+    if (s.house !== houseName) await loadHouse(s.house);
     if (s.floor !== lastFloor) { trail = []; lastFloor = s.floor; }
     const last = trail[trail.length - 1];
     if (!last || Math.hypot(last.x - s.x, last.y - s.y) > 0.3) trail.push({ x: s.x, y: s.y });
@@ -194,10 +209,15 @@ async function poll() {
   setTimeout(poll, 100);
 }
 
-(async () => {
-  house = await (await fetch("/house.json")).json();
+// The phone can switch houses; `name` is the one /state says is loaded.
+async function loadHouse(name) {
+  house = await (await fetch("/house.json", { cache: "no-store" })).json();
   floors = house.floors.map(renderFloor);
-  poll();
-})();
+  houseName = name;
+  trail = [];
+  lastFloor = -1;
+}
+
+poll();
 </script></body></html>
 """#

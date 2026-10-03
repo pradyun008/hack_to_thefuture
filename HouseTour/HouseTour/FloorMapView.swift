@@ -4,12 +4,14 @@ import UIKit
 
 /// The touch surface, used like a laptop trackpad. One finger drags the avatar
 /// by the finger's movement, never to where the finger is, so seeing the map
-/// gives no shortcut. Single tap says the room; two-finger tap asks "where am
-/// I"; triple tap finds the front door. Marked `allowsDirectInteraction` so raw
+/// gives no shortcut. Single tap says the room; double tap describes what's
+/// around you; two-finger tap asks "where am I"; triple tap finds the front door. Marked `allowsDirectInteraction` so raw
 /// touches reach it while VoiceOver is on.
 final class FloorMapView: UIView {
     var explorer: Explorer!
     var onTouch: (() -> Void)?
+    var onSingleTap: (() -> Void)?
+    var onDoubleTap: (() -> Void)?
     var onWhereAmI: (() -> Void)?
     var onFindDoor: (() -> Void)?
 
@@ -19,7 +21,7 @@ final class FloorMapView: UIView {
     /// Fine movement divides the gain by this, for lining up with a doorway.
     static let fineDivisor = 3.0
 
-    /// Off: a plain dark surface. On: the plan and avatar dot, for people watching.
+    /// Off: a plain dark surface. On: the plan and the avatar, for people watching.
     var showMap = false {
         didSet {
             guard showMap != oldValue else { return }
@@ -33,6 +35,7 @@ final class FloorMapView: UIView {
 
     private var images: [Int: UIImage] = [:]
     private let dot = CAShapeLayer()
+    private let pointer = CAShapeLayer()   // the avatar's head, showing which way it faces
     private let hint = UILabel()
 
     private var tracking: UITouch?
@@ -54,8 +57,13 @@ final class FloorMapView: UIView {
         dot.strokeColor = UIColor.white.cgColor
         dot.lineWidth = 2
         layer.addSublayer(dot)
+        pointer.fillColor = UIColor.systemRed.cgColor
+        pointer.strokeColor = UIColor.white.cgColor
+        pointer.lineWidth = 2
+        pointer.lineJoin = .round
+        layer.addSublayer(pointer)
 
-        hint.text = "Drag to move. Two-finger tap: where am I. Triple tap: front door."
+        hint.text = "Drag to move. Double tap: what's around you. Two-finger tap: where am I. Triple tap: front door."
         hint.textColor = UIColor(white: 0.6, alpha: 1)
         hint.font = .preferredFont(forTextStyle: .body)
         hint.numberOfLines = 0
@@ -71,7 +79,7 @@ final class FloorMapView: UIView {
 
         isAccessibilityElement = true
         accessibilityLabel = "Touch surface"
-        accessibilityHint = "Drag to move. Single tap for the room. Two finger tap for where am I. Triple tap to find the front door."
+        accessibilityHint = "Drag to move. Single tap for the room. Double tap for what's around you. Two finger tap for where am I. Triple tap to find the front door."
         accessibilityTraits = .allowsDirectInteraction
     }
 
@@ -107,13 +115,27 @@ final class FloorMapView: UIView {
         updateDot()
     }
 
+    /// The avatar: a body circle with a pointed head on the side it faces.
     func updateDot() {
-        guard showMap, let p = explorer?.position else {
+        guard showMap, let explorer else {
             dot.path = nil
+            pointer.path = nil
             return
         }
-        let c = toPoints(p)
+        let c = toPoints(explorer.position)
         dot.path = UIBezierPath(ovalIn: CGRect(x: c.x - 11, y: c.y - 11, width: 22, height: 22)).cgPath
+        // Heading 0 is up the screen; screen y grows downward.
+        let h = explorer.heading
+        let ahead = CGVector(dx: sin(h), dy: -cos(h)), side = CGVector(dx: cos(h), dy: sin(h))
+        let at = { (forward: CGFloat, across: CGFloat) in
+            CGPoint(x: c.x + ahead.dx * forward + side.dx * across, y: c.y + ahead.dy * forward + side.dy * across)
+        }
+        let head = UIBezierPath()
+        head.move(to: at(22, 0))
+        head.addLine(to: at(7, 8))
+        head.addLine(to: at(7, -8))
+        head.close()
+        pointer.path = head.cgPath
     }
 
     // MARK: Touches
@@ -197,11 +219,15 @@ final class FloorMapView: UIView {
             onFindDoor?()
             return
         }
-        // Wait to see whether more taps follow; a lone tap says where you are.
+        // Wait to see whether more taps follow. Each new tap cancels the wait,
+        // so only the final count acts: one tap says the room, two describe
+        // what's around you, and three (above) find the front door.
         let work = DispatchWorkItem { [weak self] in
-            guard let self, self.tapTimes.count == 1 else { return }
+            guard let self else { return }
+            let count = self.tapTimes.count
             self.tapTimes = []
-            self.explorer.announceLocation()
+            if count == 1 { self.onSingleTap?() }
+            if count == 2 { self.onDoubleTap?() }
         }
         announceWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
@@ -302,9 +328,12 @@ struct FloorMap: UIViewRepresentable {
         let view = FloorMapView()
         view.explorer = app.explorer
         view.onTouch = { app.interrupt() }
+        view.onSingleTap = { app.singleTap() }
+        view.onDoubleTap = { app.explorer.describeSurroundings() }
         view.onWhereAmI = { app.explorer.whereAmI() }
         view.onFindDoor = { app.findFrontDoor() }
-        context.coordinator.positionSink = app.explorer.$position
+        context.coordinator.positionSink = app.explorer.$position.map { _ in () }
+            .merge(with: app.explorer.$heading.map { _ in () })
             .receive(on: DispatchQueue.main)
             .sink { [weak view] _ in view?.updateDot() }
         return view

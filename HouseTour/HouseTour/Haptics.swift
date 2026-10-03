@@ -43,7 +43,8 @@ final class Haptics {
 
     // MARK: Vocabulary
 
-    /// Hard, crisp knock.
+    /// Hard, crisp knock. The only full-strength, full-sharpness single hit in
+    /// the vocabulary, so it can't be mistaken for a floor.
     func wall() { play([tap(0, 1.0, 1.0)]) }
 
     /// Glassy double ping.
@@ -85,20 +86,22 @@ final class Haptics {
     }
 
     /// One footstep's worth of floor texture. Each floor is a different rhythm
-    /// (a smooth swell, a flat scrape, two or three hits, a long-short), because
-    /// with eyes closed counting is easier than judging sharpness. All under 200 ms.
+    /// (a smooth swell, a flat scrape, two soft pulses, three light ticks, a
+    /// long-short), because with eyes closed counting is easier than judging
+    /// sharpness. All under 200 ms, and all at half strength or less with no
+    /// crisp hits, so a floor never feels like the wall's hard knock.
     func texture(_ floor: FloorType) {
         switch floor {
         case .carpet:    // no hits at all: one soft smooth swell
             play([buzz(0, 0.18, 0.4, 0.05, attack: 0.07, release: 0.08)])
-        case .concrete:  // flat gritty scrape: hard-edged, no swell, no taps (a single thud felt like a wall)
-            play([buzz(0, 0.15, 0.6, 0.35, release: 0.02)])
-        case .tile:      // two firm taps, far apart: tap ... tap
-            play([tap(0, 0.65, 0.6), tap(0.16, 0.65, 0.6)])
-        case .hardwood:  // three fast crisp ticks: tk-tk-tk
-            play([tap(0, 0.55, 0.95), tap(0.05, 0.5, 0.95), tap(0.1, 0.45, 0.95)])
-        case .deck:      // long then short: a hollow drone, then a knock
-            play([buzz(0, 0.09, 0.5, 0.2), tap(0.15, 0.75, 0.35)])
+        case .concrete:  // flat gritty scrape: hard-edged, no swell, no taps
+            play([buzz(0, 0.15, 0.45, 0.35, release: 0.02)])
+        case .tile:      // two short smooth pulses, far apart: mm ... mm
+            play([buzz(0, 0.04, 0.4, 0.5, release: 0.02), buzz(0.15, 0.04, 0.4, 0.5, release: 0.02)])
+        case .hardwood:  // three fast light ticks, fading: tk-tk-tk
+            play([tap(0, 0.4, 0.45), tap(0.06, 0.33, 0.45), tap(0.12, 0.26, 0.45)])
+        case .deck:      // long then short: a hollow drone, then a dull knock
+            play([buzz(0, 0.09, 0.45, 0.2), tap(0.15, 0.45, 0.3)])
         case .unknown:
             break
         }
