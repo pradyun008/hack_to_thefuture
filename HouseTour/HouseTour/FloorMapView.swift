@@ -15,11 +15,16 @@ final class FloorMapView: UIView {
     var onToggleRail: (() -> Void)?
     var onWhereAmI: (() -> Void)?
 
-    /// Feet of avatar movement per point of finger movement. A full-width swipe
-    /// (about 390 points) covers roughly 35 ft, two or three rooms.
-    static let feetPerPoint = 0.09
-    /// Fine movement divides the gain by this, for lining up with a doorway.
-    static let fineDivisor = 3.0
+    /// Top walking speed, in feet per second, at full deflection. A house is
+    /// about 60 ft across, so crossing it takes roughly 20 seconds: a walk, not
+    /// a sprint. The footstep every `Explorer.stride` feet then lands a little
+    /// under once a second, which is what makes it read as walking.
+    static let maxSpeed = 3.0
+    /// Points of finger offset that count as full deflection. Within a thumb's
+    /// reach, so the far end of the stick is always comfortable.
+    static let maxDeflection = 90.0
+    /// Offset below this does nothing, so a resting finger never creeps.
+    static let deadzone = 6.0
 
     /// Off: a plain dark surface. On: the plan and the avatar, for people watching.
     var showMap = false {
@@ -46,6 +51,10 @@ final class FloorMapView: UIView {
     private var extraFingers = false
     private var tapTimes: [Date] = []
     private var announceWork: DispatchWorkItem?
+    /// How far the finger is held above (negative) or below its landing point,
+    /// in points. The AirPods own turning, so only this axis walks.
+    private var stick = 0.0
+    private var ticker: CADisplayLink?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -62,7 +71,7 @@ final class FloorMapView: UIView {
         pointer.lineJoin = .round
         layer.addSublayer(pointer)
 
-        hint.text = "Drag along the path. Double tap: leave the path or rejoin it. Triple tap: where you are."
+        hint.text = "Hold and push up to walk. Double tap: leave the path or rejoin it. Triple tap: where you are."
         hint.textColor = UIColor(white: 0.6, alpha: 1)
         hint.font = .preferredFont(forTextStyle: .body)
         hint.numberOfLines = 0
@@ -78,7 +87,7 @@ final class FloorMapView: UIView {
 
         isAccessibilityElement = true
         accessibilityLabel = "Touch surface"
-        accessibilityHint = "Turn your head with AirPods to face left or right. Drag up or down to walk. Single tap for the room. Double tap to leave the path or rejoin it. Triple tap for where you are."
+        accessibilityHint = "Turn your head with AirPods to face left or right. Press and hold, then push up to walk forward or down to walk back. Further is faster. Single tap for the room. Double tap to leave the path or rejoin it. Triple tap for where you are."
         accessibilityTraits = .allowsDirectInteraction
     }
 
@@ -148,6 +157,7 @@ final class FloorMapView: UIView {
             announceWork?.cancel()
             if tracking != nil {
                 tracking = nil
+                stopTicking()
                 explorer.touchUp()
             }
             extraFingers = true
@@ -168,11 +178,38 @@ final class FloorMapView: UIView {
         guard let t = tracking, touches.contains(t) else { return }
         let p = t.location(in: self)
         if p.distance(to: startPoint) > 12 { movedFar = true }
-        // Ignore finger jitter until it's clearly a drag, so taps never nudge the avatar.
-        guard movedFar || p.distance(to: startPoint) > 6 else { return }
-        let gain = Self.feetPerPoint / (Setting.fineMovement.isOn ? Self.fineDivisor : 1)
-        explorer.drag(by: CGVector(dx: (p.x - lastPoint.x) * gain, dy: (p.y - lastPoint.y) * gain))
+        // Ignore finger jitter until it's clearly a push, so taps never nudge the avatar.
+        guard movedFar || p.distance(to: startPoint) > Self.deadzone else { return }
+        stick = p.y - startPoint.y
         lastPoint = p
+        startTicking()
+    }
+
+    /// Walks the avatar once per frame while the stick is held. Distance comes
+    /// from the frame's own length, so a dropped frame costs no ground and the
+    /// footstep cadence stays honest about speed.
+    private func startTicking() {
+        guard ticker == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(tick))
+        link.add(to: .main, forMode: .common)
+        ticker = link
+    }
+
+    private func stopTicking() {
+        ticker?.invalidate()
+        ticker = nil
+        stick = 0
+    }
+
+    @objc private func tick(_ link: CADisplayLink) {
+        guard tracking != nil else { return stopTicking() }
+        let offset = abs(stick)
+        guard offset > Self.deadzone else { return }
+        // Squared response: gentle near the centre, so lining up with a doorway
+        // needs no separate fine mode, and full tilt is a normal walking pace.
+        let reach = min((offset - Self.deadzone) / (Self.maxDeflection - Self.deadzone), 1)
+        let feet = reach * reach * Self.maxSpeed * (link.targetTimestamp - link.timestamp)
+        explorer.drag(by: CGVector(dx: 0, dy: stick < 0 ? -feet : feet))
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -194,6 +231,7 @@ final class FloorMapView: UIView {
         }
         guard let t = tracking, touches.contains(t) else { return }
         tracking = nil
+        stopTicking()
         explorer.touchUp()
         guard !cancelled else { return }
 

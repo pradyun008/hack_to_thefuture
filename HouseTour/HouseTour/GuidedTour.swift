@@ -71,7 +71,7 @@ final class GuidedTour {
 
     /// `preface` is said first, as part of the same narration so nothing cuts it off.
     func start(preface: String? = nil) {
-        let intro = "Guided tour. Drag to walk to each stop. Single tap repeats directions."
+        let intro = "Guided tour. Hold and push up to walk to each stop. Single tap repeats directions."
         jump(to: 0, intro: [preface, intro].compactMap { $0 }.joined(separator: " "))
     }
 
