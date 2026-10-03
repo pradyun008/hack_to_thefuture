@@ -40,6 +40,11 @@ enum Setting {
             let house = try House(data: Data(contentsOf: URL(fileURLWithPath: path)))
             let audio = SpatialAudio()
             let explorer = Explorer(house: house, haptics: Haptics(), audio: audio, speech: Speaker())
+            let roaming = Explorer(house: house, haptics: Haptics(), audio: audio, speech: Speaker(), onRail: false)
+            precondition(!roaming.onRail && roaming.position == explorer.position,
+                         "Free roam did not start off the path at the front door")
+            roaming.toggleRail()
+            precondition(roaming.onRail, "Triple tap could not join the path from free roam")
             let start = explorer.position
             explorer.touchDown()
             explorer.drag(by: CGVector(dx: 50, dy: 0))

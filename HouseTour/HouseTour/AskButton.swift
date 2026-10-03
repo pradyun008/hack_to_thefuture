@@ -1,9 +1,9 @@
 import SwiftUI
 import UIKit
 
-/// Hold to talk: the mic is open while a finger is down. A full-width bar on
-/// the bottom edge, the easiest place to find without looking, and well
-/// away from the touch surface.
+/// Hold to talk: the mic is open while a finger is down. It fills the bottom
+/// of the screen, the easiest place to find without looking, and well away
+/// from the touch surface's walking.
 struct AskButton: View {
     let listening: Bool
     let onPress: () -> Void
@@ -13,7 +13,7 @@ struct AskButton: View {
         Label(listening ? "Listening" : "Hold to ask", systemImage: listening ? "waveform" : "mic.fill")
             .font(.body.weight(.semibold))
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 64)
+            .frame(maxWidth: .infinity, minHeight: 140)
             .background(listening ? Color.red : Color.indigo, in: RoundedRectangle(cornerRadius: 14))
             .accessibilityHidden(true)
             .overlay(PressSurface(onPress: onPress, onRelease: onRelease))

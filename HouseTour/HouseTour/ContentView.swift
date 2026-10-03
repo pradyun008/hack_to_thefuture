@@ -7,7 +7,6 @@ struct ContentView: View {
     @AppStorage(Setting.showMap.rawValue) private var showMap = Setting.showMap.defaultValue
     @AppStorage(DemoHouse.key) private var demoHouse = DemoHouse.current
     @State private var showingSettings = false
-    @State private var lastPress = Date.distantPast
     @State private var launched = false
 
     var body: some View {
@@ -36,16 +35,8 @@ struct ContentView: View {
                 .id(ObjectIdentifier(app.explorer))   // a new house gets a fresh touch surface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            Button { pressed { app.toggleTour() } } label: {
-                Label(app.tourRunning ? "Stop tour" : "Guided tour", systemImage: "figure.walk")
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 50)
-            }
-            .buttonStyle(.borderedProminent)
-            .padding([.horizontal, .top])
-
             AskButton(listening: app.listening, onPress: { app.startListening() }, onRelease: { app.stopListening() })
-                .padding()
+                .padding([.horizontal, .top])
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView(calibrateForward: app.calibrateForward) {
@@ -66,13 +57,5 @@ struct ContentView: View {
             didTutorial = true
             app.firstLaunch(tutorial: firstRun)
         }
-    }
-
-    /// Drops a press that comes within 0.6 s of the last one, so a double press
-    /// can't start and stop the tour.
-    private func pressed(_ action: () -> Void) {
-        guard Date().timeIntervalSince(lastPress) > 0.6 else { return }
-        lastPress = Date()
-        action()
     }
 }

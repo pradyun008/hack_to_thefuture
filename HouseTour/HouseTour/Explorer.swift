@@ -18,7 +18,7 @@ final class Explorer: ObservableObject {
     private(set) var headHeading: Double?
     /// Whether the avatar is locked to the route. On the rail it can only slide
     /// forward and back, which is what makes a big room impossible to get lost
-    /// in. A double tap steps off and back on.
+    /// in. A triple tap steps off and back on.
     @Published private(set) var onRail: Bool
 
     let house: House
@@ -62,14 +62,15 @@ final class Explorer: ObservableObject {
     static let repeatQuiet = 8.0     // s before a room or door you keep crossing is named again
     static let knockRepeat = 0.3     // s between knocks while pushing into a wall
 
-    init(house: House, haptics: Haptics, audio: SpatialAudio, speech: Speaker) {
+    /// `onRail` false starts in free roam, off the route, at the same spot.
+    init(house: House, haptics: Haptics, audio: SpatialAudio, speech: Speaker, onRail startOnRail: Bool = true) {
         self.house = house
         self.haptics = haptics
         self.audio = audio
         self.speech = speech
         let rail = Rail(tour: house.tour)
         self.rail = rail
-        onRail = rail != nil
+        onRail = startOnRail && rail != nil
         let index = house.frontDoor.floor
         // Exploring starts at the head of the route, which the tour lays down
         // just inside the front door.
@@ -165,14 +166,14 @@ final class Explorer: ObservableObject {
         return atan2(t.dx, -t.dy)
     }
 
-    /// Double tap: step off the route, or snap back onto it. Off the rail the
+    /// Triple tap: step off the route, or snap back onto it. Off the rail the
     /// avatar walks freely and walls stop it as usual, for feeling out a room;
     /// back on, it returns to the nearest point of the route on this floor.
     func toggleRail() {
         guard let rail else { return }
         if onRail {
             onRail = false
-            speech.request("Off the path. Double tap to come back.")
+            speech.request("Off the path. Triple tap to come back.")
             return
         }
         guard let run = rail.run(onFloor: floorIndex) else {
@@ -235,10 +236,10 @@ final class Explorer: ObservableObject {
         speech.request(roomLabel + ".")
     }
 
-    /// Triple tap: where you are, in three facts. Which room, how close you are
-    /// to a wall, and the nearest door. Nothing else: this gets asked in the
-    /// middle of walking, and a tap can't cut speech off, so every extra clause
-    /// is time the user is stuck waiting.
+    /// "Where am I", asked by voice: where you are, in three facts. Which room,
+    /// how close you are to a wall, and the nearest door. Nothing else: this
+    /// gets asked in the middle of walking, so every extra clause is time the
+    /// user is stuck waiting.
     /// "First floor, Kitchen. Wall on your left. Opening to Dining area on your right, 2 steps."
     func whereAmI() {
         let p = position
@@ -358,7 +359,7 @@ final class Explorer: ObservableObject {
     /// path doubles back, so the spot nearest in a straight line can be the
     /// far pass. If the path never enters `room`, it leads to the nearest pass
     /// by one of its doors and says to step off:
-    /// "Back along the path, 6 steps. Double tap to step off. Door to Half bath on your left, 1 step."
+    /// "Back along the path, 6 steps. Triple tap to step off. Door to Half bath on your left, 1 step."
     private func railRoute(_ rail: Rail, to target: CGPoint, room goal: Int?, tourStep: Int?) -> String {
         var s: Double
         var stepOff: String?
@@ -384,7 +385,7 @@ final class Explorer: ObservableObject {
             if close == nil { stepOff = "It's " + sideOfPath(rail, at: s, to: target) }
         }
         let d = s - railPos
-        let tail = stepOff.map { " Double tap to step off. \($0)." } ?? ""
+        let tail = stepOff.map { " Triple tap to step off. \($0)." } ?? ""
         if abs(d) < 1.5 { return (stepOff == nil ? "Right here on the path." : "On the path.") + tail }
         let rooms = roomsAlong(rail, to: s, skipping: goal)
         let through = rooms.isEmpty ? "" : " through " + spokenList(rooms)

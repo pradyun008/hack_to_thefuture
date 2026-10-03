@@ -35,8 +35,8 @@ struct Tutorial {
             ("Something built in, like a fireplace.", { haptics.fixture() }),
             ("Stairs. Hold still on them, finger down, to change floors.", { haptics.stairs(up: true) }),
             ("With headphones, this chime comes from the front door's direction. The find front door button plays it.", { audio.chime() }),
-            ("You walk a set path through the house, so you can't get lost. Push up to go along it, down to go back. Double tap to step off and feel a room yourself, and double tap again to come back.", {}),
-            ("Single tap says your room, and on the tour, the way to the next stop. Triple tap gives the room, nearest wall, and nearest door. Settings can switch off any sound or vibration.", {}),
+            ("You walk a set path through the house, so you can't get lost. Push up to go along it, down to go back. You start off the path, free to walk anywhere. Triple tap to step onto it, and triple tap again to step off and feel a room yourself.", {}),
+            ("Single tap says your room, and on the tour, the way to the next stop. Hold the bottom of the screen and ask where you are for the room, nearest wall, and nearest door. Settings can switch off any sound or vibration.", {}),
         ]
         for (line, demo) in lessons {
             guard !Task.isCancelled else { return }
