@@ -17,8 +17,14 @@ final class Explorer: ObservableObject {
     @Published private(set) var heading: Double {
         didSet { audio.face(heading) }
     }
+    /// Whether the avatar is locked to the route. On the rail it can only slide
+    /// forward and back, which is what makes a big room impossible to get lost
+    /// in. A double tap steps off and back on.
+    @Published private(set) var onRail: Bool
 
     let house: House
+    /// The route through the house, or nil if this house has none.
+    let rail: Rail?
     private let haptics: Haptics
     private let audio: SpatialAudio
     private let speech: Speaker
@@ -46,6 +52,8 @@ final class Explorer: ObservableObject {
     private var currentFixture: String?
     private var stairsHold: (since: Date, origin: CGPoint)?
     private var stairsArmed = true
+    private var railRun = 0      // which storey's stretch of the route
+    private var railPos = 0.0    // feet along that stretch
     private var beaconBoostUntil = Date.distantPast
     private var timer: Timer?
 
@@ -61,16 +69,30 @@ final class Explorer: ObservableObject {
         self.haptics = haptics
         self.audio = audio
         self.speech = speech
-        position = house.entrance
-        heading = house.entranceHeading
-        floorIndex = house.frontDoor.floor
-        let start = house.floors[house.frontDoor.floor]
-        lastLabel = start.roomIndex(at: house.entrance)
+        let rail = Rail(tour: house.tour)
+        self.rail = rail
+        onRail = rail != nil
+        let index = house.frontDoor.floor
+        // Exploring starts at the head of the route, which the tour lays down
+        // just inside the front door.
+        var start = house.entrance
+        var facing = house.entranceHeading
+        if let rail, let run = rail.run(onFloor: index) {
+            railRun = run
+            start = rail.point(run: run, at: 0)
+            let t = rail.tangent(run: run, at: 0)
+            facing = atan2(t.dx, -t.dy)
+        }
+        position = start
+        heading = facing
+        floorIndex = index
+        let plan = house.floors[index]
+        lastLabel = plan.roomIndex(at: start)
         currentRoom = lastLabel
-        roomName = currentRoom.map { start.rooms[$0].name } ?? "Outside"
-        trail = [house.entrance]
-        audio.moveListener(to: house.entrance)
-        audio.face(heading)
+        roomName = currentRoom.map { plan.rooms[$0].name } ?? "Outside"
+        trail = [start]
+        audio.moveListener(to: start)
+        audio.face(facing)
     }
 
     var isOnStairs: Bool { currentRoom.map { floor.rooms[$0].isStairs } ?? false }
@@ -99,9 +121,68 @@ final class Explorer: ObservableObject {
         guard touching else { return }
         let s = sin(heading), c = cos(heading)
         let step = CGVector(dx: delta.dx * c - delta.dy * s, dy: delta.dx * s + delta.dy * c)
+        if onRail, let rail {
+            slideRail(rail, by: step)
+            return
+        }
         let move = floor.slide(from: position, by: step)
         bump(x: move.hitX, y: move.hitY, pushing: step, at: move.end)
         walk(to: move.end)
+    }
+
+    /// On the rail the avatar has one degree of freedom, so the finger's move is
+    /// projected onto the route's own direction: dragging onward walks onward,
+    /// and a sideways drag does nothing instead of grinding into a wall. The two
+    /// ends of the route knock like walls, because they're where it runs out.
+    private func slideRail(_ rail: Rail, by step: CGVector) {
+        let t = rail.tangent(run: railRun, at: railPos)
+        let ds = step.dx * t.dx + step.dy * t.dy
+        guard abs(ds) > 0.0001 else { return }
+        let next = max(0, min(railPos + ds, rail.length(of: railRun)))
+        guard next != railPos else {
+            if Date().timeIntervalSince(lastKnock) >= Self.knockRepeat {
+                haptics.blocked(.wall)
+                lastKnock = Date()
+            }
+            return
+        }
+        // Walk the corners in between. Going straight from one arc length to
+        // another cuts the corner, and a cut corner can cross a wall even
+        // though every segment of the route is clear.
+        for corner in rail.corners(run: railRun, from: railPos, to: next) { walk(to: corner) }
+        railPos = next
+        walk(to: rail.point(run: railRun, at: next))
+        // The trackpad turns with the route, so "drag up" keeps meaning "onward"
+        // around a corner. There's no spin risk the way there is in open floor:
+        // on a track, a sideways drag can't turn you.
+        heading = railHeading(rail)
+    }
+
+    /// The compass angle of the route where the avatar stands, facing onward.
+    private func railHeading(_ rail: Rail) -> Double {
+        let t = rail.tangent(run: railRun, at: railPos)
+        return atan2(t.dx, -t.dy)
+    }
+
+    /// Double tap: step off the route, or snap back onto it. Off the rail the
+    /// avatar walks freely and walls stop it as usual, for feeling out a room;
+    /// back on, it returns to the nearest point of the route on this floor.
+    func toggleRail() {
+        guard let rail else { return }
+        if onRail {
+            onRail = false
+            speech.request("Off the path. Double tap to come back.")
+            return
+        }
+        guard let run = rail.run(onFloor: floorIndex) else {
+            speech.request("The path doesn't come to this floor.")
+            return
+        }
+        onRail = true
+        railRun = run
+        railPos = rail.project(position, run: run, near: railPos)
+        teleport(to: rail.point(run: run, at: railPos), floor: floorIndex, heading: railHeading(rail))
+        speech.request("Back on the path. " + roomLabel + ".")
     }
 
     /// Moves the avatar along a straight, already-clear line and fires whatever it
@@ -118,7 +199,8 @@ final class Explorer: ObservableObject {
         }
         position = p
         audio.moveListener(to: p)
-        updateHeading(p)
+        // On the rail the heading comes from the route, not from the way you walked.
+        if !onRail { updateHeading(p) }
         strideDistance += d
         if strideDistance >= Self.stride {
             strideDistance = 0
@@ -139,7 +221,7 @@ final class Explorer: ObservableObject {
         touching = false
         // Face the way you walked. Backing up keeps your heading, the way a
         // person stepping back still faces forward.
-        if let h = travelHeading {
+        if let h = travelHeading, !onRail {
             var turn = (h - heading).truncatingRemainder(dividingBy: 2 * .pi)
             if turn > .pi { turn -= 2 * .pi }
             if turn < -.pi { turn += 2 * .pi }
@@ -163,40 +245,23 @@ final class Explorer: ObservableObject {
         speech.request(roomLabel + ".")
     }
 
-    /// "First floor, Kitchen. Wall on your left. Tile. Front door back left, 9 steps."
-    /// Interior doors are left out on purpose: they're announced when you reach them.
+    /// Triple tap: where you are, in three facts. Which room, how close you are
+    /// to a wall, and the nearest door. Nothing else: this gets asked in the
+    /// middle of walking, and a tap can't cut speech off, so every extra clause
+    /// is time the user is stuck waiting. The floor type is still given on the
+    /// way into a room, where it isn't competing with anything.
+    /// "First floor, Kitchen. Wall on your left. Opening to Dining area on your right, 2 steps."
     func whereAmI() {
         let p = position
-        var parts: [String]
-        if let room = currentRoom {
-            let r = floor.rooms[room]
-            parts = ["\(floor.name), \(r.name)", wallHint(p, in: r.rect)]
-            if !r.isCloset, r.floor != .unknown { parts.append(r.floor.spoken) }
-        } else {
-            parts = ["\(floor.name), outside the house"]
+        guard let room = currentRoom else {
+            speech.request("\(floor.name), outside the house.")
+            return
         }
-        parts.append(frontDoorHint(from: p))
-        speech.request(parts.joined(separator: ". ") + ".")
-    }
-
-    /// Double tap: what's around you. The room and floor, the nearest doors and
-    /// where they go, the nearest built-in, and the front door.
-    /// "Kitchen, first floor. Opening to Dining area on your right, 2 steps. Front door behind you, 7 steps."
-    func describeSurroundings() {
-        let p = position
-        var parts = [currentRoom.map { "\(floor.rooms[$0].name), \(floor.name.lowercased())" }
-                     ?? "Outside the house, \(floor.name.lowercased())"]
-        let doors = nearbyDoors(p)
-        for i in doors {
+        var parts = ["\(floor.name), \(floor.rooms[room].name)", wallHint(p, in: floor.rooms[room].rect)]
+        if let i = nearbyDoors(p).first {
             let spot = floor.nearestPoint(onDoor: i, from: p)
             parts.append("\(doorName(floor.doors[i], from: currentRoom)) \(place(from: p, to: spot, heading: heading))")
         }
-        // Say where the stairs are once: a door to them, or the landmark, or
-        // (off the front door's floor) the front door hint.
-        let stairsNamed = doors.contains { floor.doors[$0].a == floor.stairsIndex || floor.doors[$0].b == floor.stairsIndex }
-        let offFrontFloor = floorIndex != house.frontDoor.floor
-        if let landmark = nearestLandmark(p, skipStairs: stairsNamed || offFrontFloor) { parts.append(landmark) }
-        parts.append(frontDoorHint(from: p, stairsSaid: stairsNamed))
         speech.request(parts.joined(separator: ". ") + ".")
     }
 
@@ -221,8 +286,17 @@ final class Explorer: ObservableObject {
     /// has, a door straight into the goal is only "Door": "Door on your left,
     /// 3 steps." A door to somewhere else starts with "Through" so its room
     /// isn't heard as the goal: "Through the door to Hall ahead, 4 steps."
-    func route(to target: CGPoint, room: Int?, name: String? = nil) -> String {
+    func route(to target: CGPoint, room: Int?, tourStep: Int? = nil, name: String? = nil) -> String {
         let p = position
+        // On the rail there's nowhere to go but along it, so a bearing would be
+        // noise: how far, and which way round, is the whole answer.
+        if onRail, let rail, rail.runs[railRun].floor == floorIndex {
+            let exact = tourStep.flatMap { rail.location(ofTourStep: $0) }
+            let s = exact?.run == railRun ? exact!.s : rail.project(target, run: railRun, near: railPos)
+            let d = s - railPos
+            if abs(d) < 1.5 { return "Right here on the path." }
+            return "\(d > 0 ? "Ahead" : "Back") along the path, \(steps(abs(d)))."
+        }
         if let here = currentRoom ?? lastLabel, let goal = room, let i = floor.firstDoor(from: here, to: goal) {
             let spot = floor.nearestPoint(onDoor: i, from: p)
             let door = floor.doors[i]
@@ -243,9 +317,17 @@ final class Explorer: ObservableObject {
     func changeFloor(viaStairs: Bool = false) {
         let goingUp = floorIndex == 0
         floorIndex = goingUp ? 1 : 0
-        if viaStairs {
-            haptics.stairs(up: goingUp)
-        } else if let landing = house.stairLanding {
+        if viaStairs { haptics.stairs(up: goingUp) }
+        if onRail, let rail, let run = rail.run(onFloor: floorIndex) {
+            // The route's two stretches meet on the stairs, so rejoin the new
+            // one at whichever of its ends is the staircase.
+            let onward = run > railRun
+            railRun = run
+            railPos = onward ? 0 : rail.length(of: run)
+            position = rail.point(run: run, at: railPos)
+            heading = railHeading(rail)
+            audio.moveListener(to: position)
+        } else if !viaStairs, let landing = house.stairLanding {
             position = landing
             audio.moveListener(to: landing)
         }
@@ -274,18 +356,32 @@ final class Explorer: ObservableObject {
 
     /// Puts the avatar somewhere directly, for the tour's restart and jump.
     /// Says nothing; the tour narrates.
-    func teleport(to p: CGPoint, floor index: Int, heading: Double) {
+    /// `tourStep` is the step of `house.tour` being jumped to, when the caller
+    /// knows it. On the rail that's better than the coordinates: the route
+    /// doubles back, so two arc lengths share one spot on the floor, and only
+    /// the step number says which of them is meant.
+    func teleport(to p: CGPoint, floor index: Int, heading: Double, tourStep: Int? = nil) {
         if floorIndex != index { floorIndex = index }
         position = p
         self.heading = heading
-        trail = [p]
-        audio.moveListener(to: p)
-        lastLabel = floor.roomIndex(at: p)
+        if onRail, let rail {
+            let exact = tourStep.flatMap { rail.location(ofTourStep: $0) }
+            if let spot = exact ?? rail.run(onFloor: index).map({ ($0, rail.project(p, run: $0, near: railPos)) }) {
+                railRun = spot.0
+                railPos = spot.1
+                position = rail.point(run: railRun, at: railPos)
+                self.heading = railHeading(rail)
+            }
+        }
+        let landed = position
+        trail = [landed]
+        audio.moveListener(to: landed)
+        lastLabel = floor.roomIndex(at: landed)
         setRoom(lastLabel)
         pending = nil
         strideDistance = 0
-        atDoors = doorsInReach(p)
-        currentFixture = floor.fixture(at: p)?.name
+        atDoors = doorsInReach(landed)
+        currentFixture = floor.fixture(at: landed)?.name
         contact = [nil, nil]
         stairsHold = nil
         stairsArmed = false
@@ -556,27 +652,14 @@ final class Explorer: ObservableObject {
         return [first]
     }
 
-    /// The nearest built-in in this room, or the stairs, within 30 ft.
-    /// "Fireplace ahead, 4 steps." A built-in behind a wall is no landmark.
-    private func nearestLandmark(_ p: CGPoint, skipStairs: Bool = false) -> String? {
-        let here = currentRoom.map { floor.rooms[$0].rect }
-        var marks = floor.fixtures.filter { here?.intersects($0.cgRect) ?? false }.map { ($0.name, $0.cgRect) }
-        if !isOnStairs, !skipStairs, let s = floor.stairsIndex { marks.append(("Stairs", floor.rooms[s].rect)) }
-        let nearest = marks
-            .map { mark in (mark.0, p.clamped(to: mark.1)) }
-            .min { p.distance(to: $0.1) < p.distance(to: $1.1) }
-        guard let nearest, p.distance(to: nearest.1) <= 30 else { return nil }
-        return "\(nearest.0) \(place(from: p, to: nearest.1, heading: heading))"
-    }
-
     /// Always names the front door, never just "the door". Off its floor it
-    /// also points to the stairs, unless `stairsSaid`.
-    private func frontDoorHint(from p: CGPoint, stairsSaid: Bool = false) -> String {
+    /// also points to the stairs.
+    private func frontDoorHint(from p: CGPoint) -> String {
         let door = house.frontDoor
         guard floorIndex == door.floor else {
             let side = floorIndex > door.floor ? "downstairs" : "upstairs"
             if isOnStairs { return "Front door \(side). You're on the stairs" }
-            guard !stairsSaid, let s = floor.stairsIndex else { return "Front door \(side)" }
+            guard let s = floor.stairsIndex else { return "Front door \(side)" }
             let r = floor.rooms[s].rect
             let c = CGPoint(x: r.midX, y: r.midY)
             return "Front door \(side). Stairs \(place(from: p, to: c, heading: heading))"
@@ -593,12 +676,5 @@ final class Explorer: ObservableObject {
         let nearest = walls.min { p.distance(to: $0) < p.distance(to: $1) }!
         guard p.distance(to: nearest) < 2.5 else { return "Middle of the room" }
         return "Wall " + relativeSide(from: p, to: nearest, heading: heading)
-    }
-}
-
-extension CGPoint {
-    /// The closest point inside `r`.
-    fileprivate func clamped(to r: CGRect) -> CGPoint {
-        CGPoint(x: min(max(x, r.minX), r.maxX), y: min(max(y, r.minY), r.maxY))
     }
 }

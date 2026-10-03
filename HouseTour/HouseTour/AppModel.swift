@@ -52,6 +52,7 @@ final class AppModel: ObservableObject {
         explorer.$heading.sink { h in viewer.update { $0.heading = h } }.store(in: &houseBag)
         explorer.$floorIndex.sink { f in viewer.update { $0.floor = f } }.store(in: &houseBag)
         explorer.$roomName.sink { name in viewer.update { $0.room = name } }.store(in: &houseBag)
+        explorer.$onRail.sink { on in viewer.update { $0.onRail = on } }.store(in: &houseBag)
     }
 
     /// Swaps in another bundled house and starts its guided tour, since every
@@ -155,6 +156,12 @@ final class AppModel: ObservableObject {
     func findFrontDoor() {
         interrupt()
         explorer.findFrontDoor()
+    }
+
+    /// Double tap on the touch surface: leave the fixed route, or snap back to it.
+    func toggleRail() {
+        interrupt()
+        explorer.toggleRail()
     }
 
     /// `then` runs when the tutorial ends, whether it finished or was stopped,

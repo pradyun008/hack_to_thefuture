@@ -26,7 +26,7 @@ enum Setting: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .wallHum: "A vibration that grows as you get close to a wall."
-        case .beacon: "A repeating chime placed at the front door. Triple tap plays it for a few seconds either way."
+        case .beacon: "A repeating chime placed at the front door. The find front door button plays it for a few seconds either way."
         case .textures: "A pattern every few steps that tells hardwood, carpet, tile, concrete, and deck apart."
         case .wind: "Loops quietly while you are outside the house."
         case .speakRooms: "Says the room name when you walk into it."

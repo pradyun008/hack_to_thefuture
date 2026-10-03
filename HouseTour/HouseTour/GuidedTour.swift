@@ -17,6 +17,7 @@ final class GuidedTour {
         let room: Int?        // reaching this room counts as arriving
         let stairs: Bool      // the stop before a climb; stepping onto the stairs counts
         let heading: Double   // facing along the tour path, for jumps
+        let step: Int         // index into house.tour, which pins it to the rail
     }
 
     let checkpoints: [Checkpoint]
@@ -61,7 +62,7 @@ final class GuidedTour {
                 ?? house.entranceHeading
             result.append(Checkpoint(floor: step.floor, point: step.point, say: say,
                                      name: room.map { floor.rooms[$0].name } ?? "Outside",
-                                     room: room, stairs: stairs, heading: heading))
+                                     room: room, stairs: stairs, heading: heading, step: i))
         }
         return result
     }
@@ -84,7 +85,7 @@ final class GuidedTour {
         guard checkpoints.indices.contains(index) else { return }
         begin()
         let cp = checkpoints[index]
-        explorer.teleport(to: cp.point, floor: cp.floor, heading: cp.heading)
+        explorer.teleport(to: cp.point, floor: cp.floor, heading: cp.heading, tourStep: cp.step)
         lastFloor = cp.floor
         target = index
         arrive(intro: intro)
@@ -221,7 +222,7 @@ final class GuidedTour {
             }
             return text
         }
-        return text + ". " + explorer.route(to: cp.point, room: cp.room)
+        return text + ". " + explorer.route(to: cp.point, room: cp.room, tourStep: cp.step)
     }
 
     /// Where on this floor's stairs to aim for: the part that connects floors.
@@ -241,7 +242,7 @@ final class GuidedTour {
         running = false
         timer?.invalidate()
         timer = nil
-        speech.say("End of the tour. Double tap for what's around you, triple tap for the front door.")
+        speech.say("End of the tour. You're still on the path. Double tap to step off or back on, triple tap for where you are.")
         onFinish?()
     }
 }
