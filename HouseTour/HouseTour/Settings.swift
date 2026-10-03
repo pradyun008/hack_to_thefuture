@@ -4,7 +4,7 @@ import SwiftUI
 /// testers found everything-on overwhelming, so only what's needed to walk the
 /// house is on at first. The settings sheet and Explorer read the same keys.
 enum Setting: String, CaseIterable, Identifiable {
-    case wallHum, beacon, textures, wind, speakRooms, speakDoors, speakObstacles, fineMovement, showMap, laptopViewer
+    case wallHum, beacon, textures, wind, speakRooms, speakDoors, speakObstacles, showMap, laptopViewer
 
     var id: String { rawValue }
 
@@ -17,7 +17,6 @@ enum Setting: String, CaseIterable, Identifiable {
         case .speakRooms: "Speak room names"
         case .speakDoors: "Speak doors when you reach them"
         case .speakObstacles: "Speak windows, railings, and fixtures"
-        case .fineMovement: "Fine movement"
         case .showMap: "Show map"
         case .laptopViewer: "Laptop viewer"
         }
@@ -32,7 +31,6 @@ enum Setting: String, CaseIterable, Identifiable {
         case .speakRooms: "Says the room name when you walk into it."
         case .speakDoors: "Says where a door goes when you are standing in it."
         case .speakObstacles: "Says the name when you bump something other than a plain wall."
-        case .fineMovement: "Each swipe moves you a third as far."
         case .showMap: "For sighted people watching. Movement works the same either way."
         case .laptopViewer: "Lets a laptop on the same Wi-Fi watch the map live while this screen stays blank."
         }
@@ -41,7 +39,7 @@ enum Setting: String, CaseIterable, Identifiable {
     var defaultValue: Bool {
         switch self {
         case .textures, .speakRooms, .speakDoors, .laptopViewer: true
-        case .wallHum, .beacon, .wind, .speakObstacles, .fineMovement, .showMap: false
+        case .wallHum, .beacon, .wind, .speakObstacles, .showMap: false
         }
     }
 
