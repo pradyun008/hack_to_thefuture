@@ -174,7 +174,8 @@ final class Floor {
 
     /// Distance in feet to the nearest blocking cell, if one is within `radius`.
     func distanceToBlocking(from p: CGPoint, within radius: Double) -> Double? {
-        let span = Int(ceil(radius / cellSize))
+        // Include the cell whose far edge lies exactly at the search radius.
+        let span = Int(ceil(radius / cellSize)) + 1
         let c0 = Int(floor(p.x / cellSize)), r0 = Int(floor(p.y / cellSize))
         let rLo = max(r0 - span, 0), rHi = min(r0 + span, rows - 1)
         let cLo = max(c0 - span, 0), cHi = min(c0 + span, cols - 1)

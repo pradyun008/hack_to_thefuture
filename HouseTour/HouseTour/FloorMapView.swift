@@ -78,7 +78,7 @@ final class FloorMapView: UIView {
 
         isAccessibilityElement = true
         accessibilityLabel = "Touch surface"
-        accessibilityHint = "Drag to move along the path. Single tap for the room. Double tap to leave the path or rejoin it. Triple tap for where you are."
+        accessibilityHint = "Turn your head with AirPods to face left or right. Drag up or down to walk. Single tap for the room. Double tap to leave the path or rejoin it. Triple tap for where you are."
         accessibilityTraits = .allowsDirectInteraction
     }
 
