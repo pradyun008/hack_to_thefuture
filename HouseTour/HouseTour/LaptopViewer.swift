@@ -125,38 +125,55 @@ final class LaptopViewer {
 /// app uses, so the two can't disagree.
 private let viewerPage = #"""
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>House Tour · Live viewer</title><style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
-:root{--ink:#233b37;--muted:#6b7974;--green:#246d57;--line:#e3e7df;--paper:#f6f7f2}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px 'DM Sans',system-ui,sans-serif}button,select{font:inherit}button,a,select,input{touch-action:manipulation}button{cursor:pointer}button{color:inherit}button:focus-visible,a:focus-visible,select:focus-visible,canvas:focus-visible,input:focus-visible{outline:3px solid #b36c24;outline-offset:4px}.skip{position:fixed;top:-60px;z-index:10;background:white;padding:15px}.skip:focus{top:10px}.rail{position:fixed;inset:0 auto 0 0;width:244px;background:#193d35;color:#cbd9d2;padding:35px 22px;display:flex;flex-direction:column}.brand{color:white;text-decoration:none;font:800 26px Manrope,system-ui;letter-spacing:-1px;position:relative;margin-bottom:57px}.brand>span:not(.brand-icon){font-weight:400;color:#b8d8c7}.brand-icon{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid #81ad96;border-radius:10px;margin-right:7px;font-size:28px}.brand small{display:block;font:9px 'DM Sans',sans-serif;letter-spacing:2.1px;margin:12px 0 0 44px;color:#a9c4b6}.nav-label{font-size:9px;font-weight:700;letter-spacing:1.6px;color:#9cb5a9;margin:0 13px 14px;display:flex;justify-content:space-between}.nav{width:100%;background:none;border:0;border-radius:9px;color:#c0d2c8;text-align:left;padding:14px 13px;display:flex;align-items:center;gap:13px;margin-bottom:4px}.nav.active{background:#31554a;color:white}.nav>span:first-child{font-size:19px;width:20px}.nav-dot{width:5px;height:5px;border-radius:50%;background:#c3ddb9;margin-left:auto}.rail-divider{height:1px;background:#416154;margin:26px 11px}.room-button{width:100%;border:0;background:none;color:#c5d6cc;text-align:left;padding:10px 13px;font-size:12px;border-radius:7px;display:flex;gap:12px;align-items:center}.room-button::before{content:'';width:5px;height:5px;border:1px solid #87a997;border-radius:50%}.room-button.selected{background:#284c40;color:#fff}.room-button.selected::before{background:#c9dfb9}#rooms{overflow:auto;max-height:38vh}.rail-bottom{margin-top:auto;padding:28px 12px 0}.access-icon{display:block;color:#aac7b0;font-size:29px;margin-bottom:12px}.rail-bottom strong{font-size:12px;color:#e0e9df}.rail-bottom p{font-size:11px;line-height:1.9;color:#a8c1b3}.prototype{display:block;font-size:8px;letter-spacing:1.2px;margin-top:25px;color:#a8c1b3}.workspace{margin-left:244px}header{height:77px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 40px;background:#fcfcf9}.breadcrumb{font-size:12px;color:var(--muted)}.breadcrumb span{margin:0 17px;color:#9da99e}.breadcrumb strong{font-weight:500;color:var(--ink)}.connection{border:1px solid #dce4d9;background:#fff;border-radius:25px;padding:10px 15px;font-size:11px;display:flex;align-items:center;gap:9px}.dot{width:7px;height:7px;background:#ad7c3c;border-radius:50%}main{max-width:1550px;margin:auto;padding:35px 40px 18px}.title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:29px}.eyebrow{font-size:9px;font-weight:700;letter-spacing:1.65px;color:var(--muted);display:flex;align-items:center;gap:7px}h1{font:600 34px Manrope,system-ui;letter-spacing:-1.3px;margin:10px 0}.title-row p{color:var(--muted);font-size:12px;margin:0}.house-select label{display:block;font-size:8px;letter-spacing:1.3px;color:var(--muted);margin-bottom:9px}.house-select select{background:white;padding:10px 30px 10px 12px;border:1px solid var(--line);border-radius:7px;font-size:11px}.tour-layout{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:22px}.map-card{background:white;border:1px solid var(--line);border-radius:13px;overflow:hidden;min-width:0}.map-toolbar{height:64px;display:flex;justify-content:space-between;align-items:center;padding:0 20px;border-bottom:1px solid var(--line);gap:10px}.map-toolbar>div:first-child{display:flex;align-items:center;gap:9px}h2{font:700 13px Manrope,system-ui;margin:0}.live-dot{width:6px;height:6px;border-radius:50%;background:#438365;display:inline-block}.badge{font-size:9px;padding:5px 8px;border-radius:5px;background:#edf3e9;color:#456744}.segmented{display:flex;padding:3px;background:#f1f3ee;border-radius:6px;gap:3px}.segmented button{border:0;background:none;border-radius:4px;font-size:9px;padding:7px 10px;color:var(--muted)}.segmented button.selected{background:white;color:var(--ink);box-shadow:0 1px 4px #0001}.map-wrap{height:505px;position:relative;background-color:#fafbf7;background-image:radial-gradient(#d9dfd4 .7px,transparent .7px);background-size:15px 15px;overflow:hidden}canvas{width:100%;height:100%;display:block}.map-note{position:absolute;top:21px;left:22px;font-size:8px;letter-spacing:1.3px;color:#7c877d;pointer-events:none}.map-note span{margin-left:5px}.compass{position:absolute;right:25px;top:25px;text-align:center;font-size:11px;color:#7b887d;line-height:1.8}.map-controls{position:absolute;right:18px;bottom:53px;display:grid;border-radius:8px;overflow:hidden;box-shadow:0 3px 12px #203b3710;border:1px solid var(--line)}.map-controls button{background:white;border:0;border-bottom:1px solid var(--line);width:32px;height:32px;font-size:17px}.map-controls button:last-child{border-bottom:0}.map-footnote{position:absolute;bottom:18px;left:22px;right:22px;display:flex;gap:18px;font-size:9px;color:#68776c}.map-footnote span:last-child{margin-left:auto}.legend{display:flex;align-items:center;gap:18px;min-height:51px;padding:12px 20px;font-size:9px;color:var(--muted);border-top:1px solid var(--line);flex-wrap:wrap}.legend span{display:flex;gap:7px;align-items:center}.legend i{display:inline-block}.legend-you{width:8px;height:8px;border-radius:50%;background:var(--green)}.legend-path{width:16px;border-top:2px dashed #96ad8d}.legend-door{width:10px;height:5px;background:#bb8949}.legend label{margin-left:auto;display:flex;align-items:center;gap:5px}input{accent-color:var(--green)}.details{display:flex;flex-direction:column;gap:16px}.location-card{position:relative;background:#edf2e8;border:1px solid #dce6d4;border-radius:12px;padding:22px 18px}.location-card h2{font-size:23px;margin:13px 0 5px;letter-spacing:-.5px}.location-card>p{font-size:10px;color:#687863;margin:0}.location-icon{position:absolute;right:18px;top:51px;font-size:23px;color:#719164}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:21px 0}.metrics small{display:block;font-size:8px;letter-spacing:1px;color:#65775f;margin-bottom:7px}.metrics strong{font-size:12px;font-weight:500}.outline{width:100%;border:1px solid #bfceb6;border-radius:6px;padding:10px;background:transparent;font-size:10px}.nearby-card{border:1px solid var(--line);background:#fff;border-radius:12px;padding:17px 18px}.section-heading{display:flex;justify-content:space-between;margin-bottom:9px}.section-heading>span{color:#8b9d86}.nearby-item{display:flex;gap:11px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0e9}.nearby-item:last-child{border:0}.nearby-symbol{width:29px;height:29px;display:grid;place-items:center;background:#f4f5ef;border-radius:7px;color:#768a6c;font-size:16px}.nearby-item strong{display:block;font-size:11px;font-weight:500}.nearby-item small{display:block;font-size:9px;color:var(--muted);margin-top:4px}.guide-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:17px 18px;flex:1}.guide-icon{font-size:23px;color:#798f68;float:right}.guide-card h2{margin:3px 0 9px}.guide-card p{font-size:11px;color:var(--muted);line-height:1.7;margin:0 0 16px;max-width:190px}.primary{width:100%;padding:12px;background:var(--green);color:white;border:0;border-radius:7px;font-size:11px;display:flex;justify-content:space-between}.narration{display:flex;align-items:center;gap:17px;background:white;border:1px solid var(--line);border-radius:12px;padding:19px 21px;margin-top:21px;min-height:92px}.audio-icon{background:#edf2e8;color:#57764a;border-radius:10px;width:44px;height:44px;display:grid;place-items:center;font-size:12px;flex-shrink:0}.narration-copy{flex:1}.narration .eyebrow{font-size:8px}.narration .eyebrow span{font-size:7px;background:#f2f4ee;padding:3px 5px;letter-spacing:.5px}.narration p{margin:8px 0 0;font-size:12px;line-height:1.7}.round{width:33px;height:33px;border:1px solid var(--line);border-radius:50%;background:white;font-size:19px}.sound-toggle{background:none;border:1px solid var(--line);border-radius:6px;padding:9px;font-size:10px}footer{display:flex;justify-content:space-between;font-size:9px;color:#778575;margin-top:22px}dialog{border:1px solid var(--line);border-radius:16px;padding:35px;max-width:530px;width:90%;color:var(--ink);box-shadow:0 20px 80px #10251c33}dialog::backdrop{background:#10251c66}dialog h2{font-size:22px;margin-bottom:17px}dialog p,dialog li{line-height:1.8;color:var(--muted);font-size:13px}.dialog-close{position:absolute;right:12px;top:10px;border:0;background:none;font-size:24px}.dialog-info{background:#edf2e8;border-radius:9px;padding:16px;margin:18px 0}.dialog-room{padding:10px 0;border-bottom:1px solid var(--line)}@media(min-width:1500px){.map-wrap{height:590px}}@media(max-width:1150px){.rail{width:205px;padding:30px 15px}.workspace{margin-left:205px}main{padding:25px}header{padding:0 25px}.tour-layout{grid-template-columns:minmax(0,1fr) 240px;gap:15px}.map-toolbar{padding:0 12px}.badge{display:none}}@media(max-width:850px){.rail{position:static;width:auto;padding:17px 22px;display:block}.brand{margin:0;display:block}.brand small,.rail .nav-label,.rail .nav,.rail-divider,#rooms,.rail-bottom{display:none}.workspace{margin:0}header{height:65px;padding:0 20px}.tour-layout{grid-template-columns:1fr}.details{display:grid;grid-template-columns:1fr 1fr}.guide-card{grid-column:1/-1}.title-row{gap:15px}h1{font-size:27px}.map-wrap{height:480px}}@media(max-width:520px){main{padding:23px 15px}.breadcrumb{font-size:10px}.connection{font-size:9px;padding:8px}.title-row{display:block}.house-select{margin-top:18px}.details{display:flex}.narration{flex-wrap:wrap}.narration-copy{min-width:70%}.map-footnote{gap:8px;font-size:8px}.map-footnote span:last-child{display:none}footer{gap:20px}.map-toolbar h2{font-size:11px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
-</style><style>
-.map-wrap{height:505px;display:flex;align-items:center;justify-content:center}#map{width:100%;height:100%;object-fit:contain}.viewer-room{padding:10px 13px;font-size:12px;color:#c5d6cc}.viewer-room.selected{background:#31554a;border-radius:7px;color:white}.viewer-note{font-size:11px;color:var(--muted);line-height:1.8}.connection{cursor:default}#room{font-size:23px;overflow-wrap:anywhere}#said{transition:opacity 1s}#status:empty::after{content:'Free explore'}.rail-bottom{padding-top:15px}.map-footnote{justify-content:center}.nav-static{padding:14px 13px;background:#31554a;border-radius:9px;color:white;margin-bottom:24px}.location-card{min-height:190px}.details .guide-card{flex:0}.nearby-card{flex:1}.map-toolbar #floor{font-size:11px;color:var(--muted)}@media(prefers-reduced-motion:reduce){#said{transition:none}}@media(min-width:1500px){.map-wrap{height:590px}}
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>House Tour · Live viewer</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:#fff;color:#111;font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+header{display:flex;justify-content:space-between;gap:16px;padding:22px 36px;font-size:12px;color:#8a8a8a}
+#status{display:flex;gap:8px;align-items:center;color:#2563eb}
+#status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+#status.off{color:#8a8a8a}
+.stage{margin:0 36px;background:#fafafa;border-radius:12px;min-height:0}
+canvas{display:block;width:100%;height:100%}
+footer{padding:20px 36px 36px;max-width:900px;width:100%;margin:0 auto;text-align:center}
+#where{font-size:12px;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase}
+#where b{color:#111;font-weight:600}
+#ticks{display:flex;gap:4px;justify-content:center;margin:14px 0 18px;min-height:3px}
+#ticks i{width:22px;height:3px;border-radius:2px;background:#e6e6e6}
+#ticks i.done{background:#a9c2f5}#ticks i.now{background:#2563eb}
+#said{font-size:22px;line-height:1.45;color:#222;min-height:64px;margin:0;transition:opacity .8s}
+@media(max-width:700px){header,footer{padding-left:18px;padding-right:18px}.stage{margin:0 18px}#said{font-size:18px}}
+@media(prefers-reduced-motion:reduce){#said{transition:none}}
 </style></head><body>
-<a class="skip" href="#main">Skip to live tour</a>
-<aside class="rail"><div class="brand"><span class="brand-icon">⌂</span> house<span>tour</span><small>SPACE FOR EVERYONE</small></div><div class="nav-label">YOUR WORKSPACE</div><div class="nav-static">▦ &nbsp; Live house tour</div><div class="nav-label">ROOMS ON THIS FLOOR</div><div id="rooms"></div><div class="rail-bottom"><span class="access-icon">◎</span><strong>A different way to see.</strong><p>Explore through sound,<br>touch, and your own curiosity.</p><span class="prototype">IPHONE COMPANION VIEWER</span></div></aside>
-<div class="workspace"><header><span class="breadcrumb">Your homes <span>/</span> <strong>Live tour</strong></span><span class="connection"><span class="live-dot"></span> iPhone companion</span></header>
-<main id="main" tabindex="-1"><div class="title-row"><div><div class="eyebrow">EXPLORE AT YOUR OWN PACE</div><h1>A place to call home.</h1><p id="address">Waiting for your iPhone…</p></div><div class="house-select"><div class="eyebrow">CONTROLLED FROM YOUR IPHONE</div></div></div>
-<div class="tour-layout"><section class="map-card" aria-labelledby="mapTitle"><div class="map-toolbar"><div><span class="live-dot"></span><h2 id="mapTitle">Your exploration</h2><span id="status" class="badge"></span></div><span id="floor"></span></div><div class="map-wrap"><div class="map-note">LIVE FLOOR PLAN</div><canvas id="map" aria-label="Live floorplan and position from the iPhone. The current room and floor are provided as text beside the map."></canvas><div class="map-footnote">Move on your iPhone. Follow your exploration here.</div></div><div class="legend"><span><i style="width:8px;height:8px;border-radius:50%;background:#e74c3c"></i>Your position</span><span><i style="width:16px;border-top:2px solid #e74c3c80"></i>Exploration path</span><span><i style="width:10px;height:5px;background:#2ecc71"></i>Entrance</span></div></section>
-<aside class="details"><section class="location-card"><div class="eyebrow"><span class="live-dot"></span> YOU ARE HERE</div><h2 id="room">Connecting...</h2><p id="roomMeta">Location comes directly from your phone.</p><div class="metrics"><div><small>ROOM SIZE</small><strong id="roomSize">—</strong></div><div><small>FLOOR SURFACE</small><strong id="surface">—</strong></div></div></section><section class="nearby-card"><div class="section-heading"><h2>House at a glance</h2><span>⌂</span></div><p id="summary" class="viewer-note">Open House Tour on your iPhone to begin.</p><p class="viewer-note">The floor, position, tour status, and narration follow your iPhone automatically.</p></section><section class="guide-card"><span class="guide-icon">✧</span><h2>You set the pace.</h2><p>Use the guided tour or explore freely with your iPhone. This screen follows along.</p></section></aside></div>
-<section class="narration" aria-labelledby="narrationTitle"><div class="audio-icon" aria-hidden="true">▂ ▅ ▇ ▅ ▂</div><div class="narration-copy"><div class="eyebrow" id="narrationTitle">LIVE NARRATION <span>FROM YOUR IPHONE</span></div><p id="said"></p></div></section><footer><span>Designed for independent exploration.</span><span>Sound + touch. A home, understood.</span></footer>
-</main></div><script>
-const colors = { hardwood: "#eecc9e", carpet: "#d6d6f2", tile: "#bde3f2", concrete: "#d1d1d1",
-                 deck: "#ccb294", unknown: "#f7f2d9" };
-const cellColors = { "#": "#000", w: "#2f7bf5", s: "#2aa8a8", r: "#f59a23", v: "#999" };
+<header><span id="address">Waiting for your iPhone…</span><span id="status" class="off">Connecting</span></header>
+<div class="stage"><canvas id="map" role="img" aria-label="Live floor plan with your position. The room and floor are written below it."></canvas></div>
+<footer><div id="where" aria-live="polite">Open House Tour on your iPhone</div><div id="ticks" aria-hidden="true"></div><p id="said" aria-live="polite"></p></footer>
+<script>
+const palette = { room: "#ffffff", wall: "#2b2b2b", window: "#bcd3f5", stairs: "#ededed", label: "#a3a3a3",
+                  route: "rgba(37,99,235,.28)", stop: "rgba(37,99,235,.55)", trail: "rgba(37,99,235,.5)", you: "#2563eb" };
+const cellColors = { "#": palette.wall, w: palette.window, s: palette.stairs, r: "#dcdcdc", v: "#dcdcdc" };
+const surfaces = { hardwood: "Hardwood", carpet: "Carpet", tile: "Tile", concrete: "Concrete", deck: "Deck" };
 let house, houseName, floors = [], trail = [], lastFloor = -1;
 const canvas = document.getElementById("map"), ctx = canvas.getContext("2d");
+const $ = id => document.getElementById(id);
+
+// Only touch the DOM when text changes, so aria-live regions don't re-announce every poll.
+function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
 
 function renderFloor(f) {
   const px = 8, c = document.createElement("canvas");
   c.width = f.cols * px; c.height = f.rows * px;
   const g = c.getContext("2d");
-  g.fillStyle = "#222"; g.fillRect(0, 0, c.width, c.height);
   for (let r = 0; r < f.rows; r++) for (let col = 0; col < f.cols; col++) {
-    const i = r * f.cols + col, k = f.cells[i], room = f.rooms[i];
-    let fill = cellColors[k];
-    if (!fill && room !== ".") fill = colors[f.roomList[room.charCodeAt(0) - 65].floor];
+    const i = r * f.cols + col;
+    const fill = cellColors[f.cells[i]] || (f.rooms[i] !== "." ? palette.room : null);
     if (!fill) continue;
     g.fillStyle = fill; g.fillRect(col * px, r * px, px, px);
   }
-  g.fillStyle = "#222"; g.font = "bold 26px -apple-system, sans-serif"; g.textAlign = "center";
+  g.fillStyle = palette.label; g.font = "500 22px -apple-system, system-ui, sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
   const ft = px / house.cellSize;
   for (const room of f.roomList) {
     if (room.kind === "closet") continue;
@@ -167,53 +184,72 @@ function renderFloor(f) {
 }
 
 function draw(s) {
-  const img = floors[s.floor];
-  const scale = Math.min(innerWidth / img.width, (innerHeight - 110) / img.height);
-  canvas.width = img.width * scale; canvas.height = img.height * scale;
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const ft = canvas.width / house.width;
+  const img = floors[s.floor], box = canvas.getBoundingClientRect(), u = devicePixelRatio || 1;
+  canvas.width = box.width * u; canvas.height = box.height * u;
+  const scale = Math.min(canvas.width / img.width, canvas.height / img.height) * 0.9;
+  const w = img.width * scale, h = img.height * scale, ox = (canvas.width - w) / 2, oy = (canvas.height - h) / 2;
+  ctx.drawImage(img, ox, oy, w, h);
+  const ft = w / house.width, at = (x, y) => [ox + x * ft, oy + y * ft];
+  ctx.lineJoin = ctx.lineCap = "round";
+
+  // The fixed route the avatar is locked to. It's house.tour, the same polyline
+  // the app rails on, so this is the route itself and not a drawing of it. Shown
+  // from page load, before anyone moves, so a tester can see where the path goes.
+  const steps = house.tour.filter(p => p.floor === s.floor);
+  ctx.strokeStyle = palette.route; ctx.lineWidth = 2 * u; ctx.setLineDash([6 * u, 6 * u]);
+  ctx.beginPath(); steps.forEach((p, i) => ctx[i ? "lineTo" : "moveTo"](...at(p.x, p.y))); ctx.stroke();
+  ctx.setLineDash([]); ctx.fillStyle = palette.stop;
+  for (const p of steps) if (p.say) { ctx.beginPath(); ctx.arc(...at(p.x, p.y), 3 * u, 0, Math.PI * 2); ctx.fill(); }
+
   if (house.frontDoor.floor === s.floor) {
-    ctx.fillStyle = "#2ecc71";
-    ctx.fillRect(house.frontDoor.x * ft - 18, house.frontDoor.y * ft - 7, 36, 14);
+    const [dx, dy] = at(house.frontDoor.x, house.frontDoor.y);
+    ctx.fillStyle = palette.you; ctx.fillRect(dx - 10 * u, dy - 2 * u, 20 * u, 4 * u);
   }
-  drawRoute(s.floor, ft);
-  ctx.strokeStyle = "rgba(231, 76, 60, 0.5)"; ctx.lineWidth = 4; ctx.beginPath();
-  trail.forEach((p, i) => i ? ctx.lineTo(p.x * ft, p.y * ft) : ctx.moveTo(p.x * ft, p.y * ft));
-  ctx.stroke();
-  // The avatar: a body circle with a pointed head on the side it faces.
-  const cx = s.x * ft, cy = s.y * ft, ax = Math.sin(s.heading), ay = -Math.cos(s.heading);
-  const at = (f, a) => [cx + ax * f - ay * a, cy + ay * f + ax * a];
-  ctx.fillStyle = "#e74c3c"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(...at(24, 0)); ctx.lineTo(...at(8, 9)); ctx.lineTo(...at(8, -9)); ctx.closePath();
-  ctx.lineJoin = "round"; ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = palette.trail; ctx.lineWidth = 3 * u;
+  ctx.beginPath(); trail.forEach((p, i) => ctx[i ? "lineTo" : "moveTo"](...at(p.x, p.y))); ctx.stroke();
+
+  // The avatar: a dot with a soft cone on the side it faces. Heading 0 is up the plan.
+  const [cx, cy] = at(s.x, s.y), facing = s.heading - Math.PI / 2;
+  ctx.fillStyle = palette.you; ctx.globalAlpha = 0.15;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, 34 * u, facing - 0.5, facing + 0.5); ctx.fill();
+  ctx.globalAlpha = 1; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5 * u;
+  ctx.beginPath(); ctx.arc(cx, cy, 7 * u, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 }
 
-// The fixed route the avatar is locked to. It's house.tour, the same polyline
-// the app rails on, so this is the route itself and not a drawing of it. Shown
-// from page load, before anyone moves, so a tester can see where the path goes.
-function drawRoute(floor, ft) {
-  const steps = house.tour.filter(p => p.floor === floor);
-  if (steps.length < 2) return;
-  ctx.save();
-  ctx.strokeStyle = "rgba(46, 134, 222, 0.85)";
-  ctx.lineWidth = 6;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.setLineDash([14, 9]);
-  ctx.beginPath();
-  steps.forEach((p, i) => i ? ctx.lineTo(p.x * ft, p.y * ft) : ctx.moveTo(p.x * ft, p.y * ft));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  // Narrated stops sit a little larger than the plain corners.
-  for (const p of steps) {
-    ctx.beginPath();
-    ctx.arc(p.x * ft, p.y * ft, p.say ? 7 : 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = p.say ? "#2e86de" : "rgba(46, 134, 222, 0.6)";
-    ctx.fill();
-    if (p.say) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); }
+// Which narrated stop the avatar is at or has just passed: the count of stops up
+// to the nearest tour point on this floor.
+function stopProgress(s) {
+  let nearest = 0, best = Infinity;
+  house.tour.forEach((p, i) => {
+    const d = p.floor === s.floor ? Math.hypot(p.x - s.x, p.y - s.y) : Infinity;
+    if (d < best) { best = d; nearest = i; }
+  });
+  const stops = house.tour.map((p, i) => p.say ? i : -1).filter(i => i >= 0);
+  return { total: stops.length, current: Math.max(1, stops.filter(i => i <= nearest).length) };
+}
+
+function present(s) {
+  const f = house.floors[s.floor], room = f.roomList.find(r => r.name === s.room);
+  const size = room?.size ? room.size.map(Math.round).join(" × ") + " ft" : "";
+  const where = $("where"), name = s.room || "Outside";
+  const meta = [f.name, size, room && surfaces[room.floor]].filter(Boolean).join(" · ");
+  if (where.dataset.key !== name + meta) {
+    where.dataset.key = name + meta;
+    where.replaceChildren(Object.assign(document.createElement("b"), { textContent: name }), " · " + meta);
   }
-  ctx.restore();
+  setText($("address"), house.address);
+
+  const progress = s.touring ? stopProgress(s) : null;
+  const status = [progress ? `Stop ${progress.current} of ${progress.total}` : "Free explore",
+                  s.onRail ? "" : "Off the path"].filter(Boolean).join(" · ");
+  setText($("status"), status);
+  $("status").className = "";
+  const ticks = progress ? Array.from({ length: progress.total }, (_, i) =>
+    `<i class="${i + 1 < progress.current ? "done" : i + 1 === progress.current ? "now" : ""}"></i>`).join("") : "";
+  if ($("ticks").innerHTML !== ticks) $("ticks").innerHTML = ticks;
+
+  setText($("said"), s.said);
+  $("said").style.opacity = Date.now() / 1000 - s.saidAt < 8 ? 1 : 0.3;
 }
 
 async function poll() {
@@ -224,17 +260,11 @@ async function poll() {
     const last = trail[trail.length - 1];
     if (!last || Math.hypot(last.x - s.x, last.y - s.y) > 0.3) trail.push({ x: s.x, y: s.y });
     if (trail.length > 600) trail.shift();
-    document.getElementById("room").textContent = s.room || "Outside";
-    document.getElementById("floor").textContent = house.floors[s.floor].name;
-    document.getElementById("status").textContent =
-      [s.touring ? "Guided tour" : "", s.onRail ? "On the path" : "Off the path"]
-        .filter(Boolean).join(" \u00b7 ");
-    const said = document.getElementById("said");
-    said.textContent = s.said ? '"' + s.said + '"' : "";
-    said.style.opacity = Date.now() / 1000 - s.saidAt < 6 ? 1 : 0.25;
+    present(s);
     draw(s);
   } catch (e) {
-    document.getElementById("room").textContent = "Disconnected. Is the app open?";
+    setText($("status"), "Disconnected. Is the app open?");
+    $("status").className = "off";
   }
   setTimeout(poll, 100);
 }
@@ -249,32 +279,5 @@ async function loadHouse(name) {
 }
 
 poll();
-</script><script>
-// Display-only additions. Never changes state, movement, polling, or audio.
-const surfaces = {hardwood:'Hardwood',carpet:'Carpet',tile:'Tile',concrete:'Concrete',deck:'Deck boards',unknown:'Not listed'};
-function updatePresentation() {
-  if (!house || lastFloor < 0) return;
-  document.getElementById('address').textContent = house.address;
-  document.getElementById('summary').textContent = house.summary;
-  const f = house.floors[lastFloor];
-  const name = document.getElementById('room').textContent;
-  const room = f.roomList.find(r => r.name === name);
-  document.getElementById('roomMeta').textContent = room ? f.name : 'Location comes directly from your phone.';
-  document.getElementById('roomSize').textContent = room?.size ? room.size.map(v => Math.round(v*10)/10).join(' × ')+' ft' : 'Not listed';
-  document.getElementById('surface').textContent = room ? surfaces[room.floor] : '—';
-  const list = document.getElementById('rooms');
-  list.replaceChildren();
-  for (const r of f.roomList) {
-    if (r.kind === 'closet') continue;
-    const item = document.createElement('div');
-    item.className = 'viewer-room' + (r === room ? ' selected' : '');
-    item.textContent = r.name;
-    if (r === room) item.setAttribute('aria-current','location');
-    list.append(item);
-  }
-}
-new MutationObserver(updatePresentation).observe(document.getElementById('room'), {childList:true});
-
 </script></body></html>
-
 """#
