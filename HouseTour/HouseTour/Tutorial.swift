@@ -11,7 +11,7 @@ struct Tutorial {
 
     func run() async {
         var lessons: [(String, () async -> Void)] = [
-            ("Wear AirPods Pro and allow Motion access. Turn your head left or right to face that direction. Drag up to walk forward and down to walk backward. Horizontal drags do nothing. On the fixed path, up follows the route. A short high pitched beep warns when you are within one foot of a virtual wall. You start inside the front door, facing in.", {}),
+            ("Wear AirPods Pro and allow Motion access. Turn your head left or right to face that direction. Press and hold anywhere, then push up to walk forward and down to walk backward. The further you push, the faster you go, and lifting stops you. Sideways does nothing. On the fixed path, up follows the route. A short high pitched beep warns when you are within one foot of a virtual wall. You start inside the front door, facing in.", {}),
             ("Wall. A hard knock, repeating while you push.", { haptics.wall() }),
             ("Window. A glassy double tap.", { haptics.window() }),
             ("A railing, where the floor drops away.", { haptics.railing() }),
@@ -35,7 +35,7 @@ struct Tutorial {
             ("Something built in, like a fireplace.", { haptics.fixture() }),
             ("Stairs. Hold still on them, finger down, to change floors.", { haptics.stairs(up: true) }),
             ("With headphones, this chime comes from the front door's direction. The find front door button plays it.", { audio.chime() }),
-            ("You walk a set path through the house, so you can't get lost. Drag to go along it, drag back to return. Double tap to step off and feel a room yourself, and double tap again to come back.", {}),
+            ("You walk a set path through the house, so you can't get lost. Push up to go along it, down to go back. Double tap to step off and feel a room yourself, and double tap again to come back.", {}),
             ("Single tap says your room, and on the tour, the way to the next stop. Triple tap gives the room, nearest wall, and nearest door. Settings can switch off any sound or vibration.", {}),
         ]
         for (line, demo) in lessons {

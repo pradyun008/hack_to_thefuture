@@ -85,23 +85,30 @@ final class Haptics {
         play(ordered.enumerated().map { tap(Double($0.offset) * 0.11, $0.element, 0.5) })
     }
 
+    /// Strength of every footstep, against the base values below. Testers found
+    /// the originals too faint to feel while walking; at 1.8 the strongest step
+    /// is 0.81, still under the wall's full-strength knock.
+    static let stepGain: Float = 1.8
+
     /// One footstep's worth of floor texture. Each floor is a different rhythm
     /// (a smooth swell, a flat scrape, two soft pulses, three light ticks, a
     /// long-short), because with eyes closed counting is easier than judging
-    /// sharpness. All under 200 ms, and all at half strength or less with no
-    /// crisp hits, so a floor never feels like the wall's hard knock.
+    /// sharpness. All under 200 ms with no crisp hits, so a floor never feels
+    /// like the wall's hard knock: that difference lives in sharpness, which
+    /// stays low, so strength can be raised with `stepGain` without blurring it.
     func texture(_ floor: FloorType) {
+        let g = Self.stepGain
         switch floor {
         case .carpet:    // no hits at all: one soft smooth swell
-            play([buzz(0, 0.18, 0.4, 0.05, attack: 0.07, release: 0.08)])
+            play([buzz(0, 0.18, 0.4 * g, 0.05, attack: 0.07, release: 0.08)])
         case .concrete:  // flat gritty scrape: hard-edged, no swell, no taps
-            play([buzz(0, 0.15, 0.45, 0.35, release: 0.02)])
+            play([buzz(0, 0.15, 0.45 * g, 0.35, release: 0.02)])
         case .tile:      // two short smooth pulses, far apart: mm ... mm
-            play([buzz(0, 0.04, 0.4, 0.5, release: 0.02), buzz(0.15, 0.04, 0.4, 0.5, release: 0.02)])
+            play([buzz(0, 0.04, 0.4 * g, 0.5, release: 0.02), buzz(0.15, 0.04, 0.4 * g, 0.5, release: 0.02)])
         case .hardwood:  // three fast light ticks, fading: tk-tk-tk
-            play([tap(0, 0.4, 0.45), tap(0.06, 0.33, 0.45), tap(0.12, 0.26, 0.45)])
+            play([tap(0, 0.4 * g, 0.45), tap(0.06, 0.33 * g, 0.45), tap(0.12, 0.26 * g, 0.45)])
         case .deck:      // long then short: a hollow drone, then a dull knock
-            play([buzz(0, 0.09, 0.45, 0.2), tap(0.15, 0.45, 0.3)])
+            play([buzz(0, 0.09, 0.45 * g, 0.2), tap(0.15, 0.45 * g, 0.3)])
         case .unknown:
             break
         }
