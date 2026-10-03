@@ -31,6 +31,8 @@ final class Explorer: ObservableObject {
     /// Called after every move, room change, and floor change. The guided tour
     /// watches it for checkpoint arrivals.
     var onUpdate: (() -> Void)?
+    /// Things that happen silently, like bumping a wall, for the transcript.
+    var onEvent: ((String) -> Void)?
     /// Asked before a room's name is spoken on entry. The tour says no for the
     /// room it's about to narrate, so the name isn't said twice.
     var shouldAnnounceRoom: ((Int?) -> Bool)?
@@ -169,22 +171,33 @@ final class Explorer: ObservableObject {
     /// Triple tap: step off the route, or snap back onto it. Off the rail the
     /// avatar walks freely and walls stop it as usual, for feeling out a room;
     /// back on, it returns to the nearest point of the route on this floor.
+    /// The confirmations cut off whatever else is playing: a mode change nobody
+    /// hears leaves every direction after it making no sense. Each way has its
+    /// own buzz too, so it's felt even if the words are missed.
     func toggleRail() {
         guard let rail else { return }
         if onRail {
             onRail = false
-            speech.request("Off the path. Triple tap to come back.")
+            haptics.path(on: false)
+            speech.say("Off the path. Triple tap to come back.", interrupt: true)
             return
         }
         guard let run = rail.run(onFloor: floorIndex) else {
-            speech.request("The path doesn't come to this floor.")
+            speech.say("The path doesn't come to this floor.", interrupt: true)
             return
         }
         onRail = true
         railRun = run
         railPos = rail.project(position, run: run, near: railPos)
         teleport(to: rail.point(run: run, at: railPos), floor: floorIndex, heading: railHeading(rail))
-        speech.request("Back on the path. " + roomLabel + ".")
+        haptics.path(on: true)
+        speech.say("Back on the path. " + roomLabel + ".", interrupt: true)
+    }
+
+    /// Locks the avatar to the path without a word, for the tour, whose
+    /// teleport then puts it at the right spot on it.
+    func boardRail() {
+        if rail != nil { onRail = true }
     }
 
     /// Moves the avatar along a straight, already-clear line and fires whatever it
@@ -233,14 +246,14 @@ final class Explorer: ObservableObject {
 
     /// Short location, said on a single tap.
     func announceLocation() {
-        speech.request(roomLabel + ".")
+        speech.say(roomLabel + ".", interrupt: true)
     }
 
     /// "Where am I", asked by voice: where you are, in three facts. Which room,
     /// how close you are to a wall, and the nearest door. Nothing else: this
     /// gets asked in the middle of walking, so every extra clause is time the
     /// user is stuck waiting.
-    /// "First floor, Kitchen. Wall on your left. Opening to Dining area on your right, 2 steps."
+    /// "First floor, Kitchen. Wall on your left. Opening to Dining area, turn 90 degrees right, 2 steps."
     func whereAmI() {
         let p = position
         guard let room = currentRoom else {
@@ -250,15 +263,15 @@ final class Explorer: ObservableObject {
         var parts = ["\(floor.name), \(floor.rooms[room].name)", wallHint(p, in: floor.rooms[room].rect)]
         if let i = nearbyDoors(p).first {
             let spot = floor.nearestPoint(onDoor: i, from: p)
-            parts.append("\(doorName(floor.doors[i], from: currentRoom)) \(place(from: p, to: spot, heading: heading))")
+            parts.append("\(doorName(floor.doors[i], from: currentRoom)), \(place(from: p, to: spot, heading: heading))")
         }
         speech.request(parts.joined(separator: ". ") + ".")
     }
 
     /// Asked aloud: every way out of the room, nearest first, and where each
     /// goes. Closets aren't ways out, so they're left out unless there's
-    /// nothing else. "Kitchen, 2 ways out. Opening to Dining area on your
-    /// right, 2 steps. Door to Hall behind you, 6 steps."
+    /// nothing else. "Kitchen, 2 ways out. Opening to Dining area, turn 90
+    /// degrees right, 2 steps. Door to Hall, turn 180 degrees, 6 steps."
     func waysOut() {
         let p = position
         guard let room = currentRoom else {
@@ -276,7 +289,7 @@ final class Explorer: ObservableObject {
         }
         // Four is plenty to hold in your head; the rest are farther anyway.
         let list = exits.prefix(4).map {
-            "\(doorName(floor.doors[$0], from: room)) \(place(from: p, to: floor.nearestPoint(onDoor: $0, from: p), heading: heading))"
+            "\(doorName(floor.doors[$0], from: room)), \(place(from: p, to: floor.nearestPoint(onDoor: $0, from: p), heading: heading))"
         }
         let count = exits.count == 1 ? "1 way out" : "\(exits.count) ways out"
         speech.request("\(name), \(count). " + list.joined(separator: ". ") + ".")
@@ -288,24 +301,7 @@ final class Explorer: ObservableObject {
         speech.request(frontDoorDirections())
     }
 
-    /// Asked aloud: the way to a room, by way of the stairs when it's on the
-    /// other floor. "Kitchen. Through the door to Hall ahead, 4 steps."
-    func wayTo(room index: Int, onFloor f: Int) {
-        let target = house.floors[f].rooms[index]
-        guard f == floorIndex else {
-            speech.request("\(target.name), \(house.floors[f].name.lowercased()). " + stairsDirections(up: f > floorIndex))
-            return
-        }
-        guard index != currentRoom else {
-            speech.request("You're in the \(target.name).")
-            return
-        }
-        let center = CGPoint(x: target.rect.midX, y: target.rect.midY)
-        let spot = target.isStairs ? house.stairLanding ?? center : center
-        speech.request("\(target.name). " + route(to: spot, room: index))
-    }
-
-    /// "Front door. Through the door to Foyer ahead, 4 steps."
+    /// "Front door. Through the door to Foyer, straight ahead, 4 steps."
     private func frontDoorDirections() -> String {
         let front = house.frontDoor
         guard front.floor == floorIndex else {
@@ -329,15 +325,19 @@ final class Explorer: ObservableObject {
     /// How to get to `target` in room `room` on this floor: through the first
     /// door on the way when it's in another room, otherwise straight there.
     /// `name` is the goal's name when the caller hasn't just said it. When it
-    /// has, a door straight into the goal is only "Door": "Door on your left,
-    /// 3 steps." A door to somewhere else starts with "Through" so its room
-    /// isn't heard as the goal: "Through the door to Hall ahead, 4 steps."
-    func route(to target: CGPoint, room: Int?, tourStep: Int? = nil, name: String? = nil) -> String {
+    /// has, a door straight into the goal is only "Door": "Door, turn 90
+    /// degrees left, 3 steps." A door to somewhere else starts with "Through"
+    /// so its room isn't heard as the goal: "Through the door to Hall,
+    /// straight ahead, 4 steps."
+    /// `arrivesOnEntry` says walking into `room` already counts as getting
+    /// there, so the steps stop at its doorway rather than at `target`.
+    func route(to target: CGPoint, room: Int?, tourStep: Int? = nil, name: String? = nil,
+               arrivesOnEntry: Bool = false) -> String {
         let p = position
         // On the rail there's nowhere to go but along it, so a bearing would be
         // noise. Which way round, the rooms on the way, and how far is the answer.
         if onRail, let rail, rail.runs[railRun].floor == floorIndex {
-            return railRoute(rail, to: target, room: room, tourStep: tourStep)
+            return railRoute(rail, to: target, room: room, tourStep: tourStep, arrivesOnEntry: arrivesOnEntry)
         }
         if let here = currentRoom ?? lastLabel, let goal = room, let i = floor.firstDoor(from: here, to: goal) {
             let spot = floor.nearestPoint(onDoor: i, from: p)
@@ -346,10 +346,10 @@ final class Explorer: ObservableObject {
             let other = doorName(door, from: here)
             let label = intoGoal ? (door.kind == "opening" ? "Opening" : "Door")
                 : name == nil ? "Through the " + other.prefix(1).lowercased() + other.dropFirst() : other
-            return "\(label) \(place(from: p, to: spot, heading: heading))."
+            return "\(label), \(place(from: p, to: spot, heading: heading))."
         }
         let there = place(from: p, to: target, heading: heading)
-        if let name { return "\(name) \(there)." }
+        if let name { return "\(name), \(there)." }
         return there.prefix(1).uppercased() + there.dropFirst() + "."
     }
 
@@ -360,12 +360,19 @@ final class Explorer: ObservableObject {
     /// far pass. If the path never enters `room`, it leads to the nearest pass
     /// by one of its doors and says to step off:
     /// "Back along the path, 6 steps. Triple tap to step off. Door to Half bath on your left, 1 step."
-    private func railRoute(_ rail: Rail, to target: CGPoint, room goal: Int?, tourStep: Int?) -> String {
+    private func railRoute(_ rail: Rail, to target: CGPoint, room goal: Int?, tourStep: Int?,
+                           arrivesOnEntry: Bool) -> String {
         var s: Double
         var stepOff: String?
         let inGoal = { (at: Double) in self.floor.roomIndex(at: rail.point(run: self.railRun, at: at)) == goal }
         if let exact = tourStep.flatMap({ rail.location(ofTourStep: $0) }), exact.run == railRun {
             s = exact.s
+            // The stop counts as reached on walking into its room, so count the
+            // steps to there: the same number the doorway gives off the path.
+            if arrivesOnEntry, goal != nil, goal != currentRoom,
+               let entry = samples(rail, from: railPos, to: exact.s).first(where: inGoal) {
+                s = entry
+            }
         } else if let goal, goal == currentRoom {
             let spots = [rail.length(of: railRun), 0].compactMap {
                 spotInRoom(rail, from: railPos, toward: $0, room: goal, target: target)
@@ -447,7 +454,7 @@ final class Explorer: ObservableObject {
     /// turn you (your head does), so it's relative to the way you face now.
     /// "on your left, 2 steps".
     private func sideOfPath(_ rail: Rail, at s: Double, to target: CGPoint) -> String {
-        place(from: rail.point(run: railRun, at: s), to: target, heading: heading)
+        place(from: rail.point(run: railRun, at: s), to: target, heading: heading, turns: false)
     }
 
     /// The rooms the path walks through between here and `s`, in order, leaving
@@ -582,6 +589,7 @@ final class Explorer: ObservableObject {
         if let fresh {
             haptics.blocked(fresh)
             lastKnock = now
+            onEvent?("Bumped " + blockedName(fresh).lowercased())
             // Not over tour narration, and never queued behind it: by then it's stale.
             if fresh != .wall, Setting.speakObstacles.isOn, !speech.isNarrating {
                 speech.say(blockedName(fresh) + ".", dedupe: 4)
@@ -778,11 +786,11 @@ final class Explorer: ObservableObject {
         return r.entrySentence
     }
 
-    /// "Follow the stairs on your left, 3 steps, then hold still."
+    /// "Stairs, turn 90 degrees left, 3 steps, then hold still."
     private func stairsGuide(from p: CGPoint) -> String {
         guard let target = house.stairLanding else { return "Hold still to change floors." }
         guard p.distance(to: target) >= 1.5 else { return "Hold still right here." }
-        return "Follow the stairs \(place(from: p, to: target, heading: heading)), then hold still."
+        return "Stairs, \(place(from: p, to: target, heading: heading)), then hold still."
     }
 
     private func blockedName(_ k: CellKind) -> String {

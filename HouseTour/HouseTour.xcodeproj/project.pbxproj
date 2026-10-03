@@ -17,9 +17,12 @@
 		2EC78661B95769C1E414A390 /* LaptopViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EAF97DE339D78C06D10A2E /* LaptopViewer.swift */; };
 		3BC2F77B0FFEB91E22CC442A /* House.swift in Sources */ = {isa = PBXBuildFile; fileRef = A143EF70857C37D6A5F629D4 /* House.swift */; };
 		4AD85D9CDA27E35F1B5D4002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BC15A9016F922AA9E46FE4 /* ContentView.swift */; };
+		70A0F94CF6451F1622DB582F /* Guide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDB628A5EBA795A694B2C8D /* Guide.swift */; };
+		989A6A12292CC639AE4CFCBA /* Transcript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7584C442B9429D8BD356EE3D /* Transcript.swift */; };
 		9C1D26E6A10778797E2EDC4F /* FloorMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AC1D059626107BBBAD52F7E /* FloorMapView.swift */; };
 		9CBE8271FE98B33F645AC636 /* Listener.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55EF84A62549EA506DB139E /* Listener.swift */; };
 		A13D0A02774BCB3211902D72 /* house.json in Resources */ = {isa = PBXBuildFile; fileRef = 4B20375CA36C0D0053B83EB8 /* house.json */; };
+		A86D86821A059A5964794C11 /* Directions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9AB57B6C201A7734E7D1F70 /* Directions.swift */; };
 		A9C23A64E395B2083A5A9DAE /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D49218E498142F628BB6217E /* Settings.swift */; };
 		ACB2F0E0C9A7EC5CB445B590 /* AskButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB221226FD5067B140C5F3D /* AskButton.swift */; };
 		B24F05755EF97BC3CFB87620 /* SpatialAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = C43F3AA435F02D410B6ED1D3 /* SpatialAudio.swift */; };
@@ -35,9 +38,11 @@
 		40060C9D9F57D6698A1C8680 /* HouseTour.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HouseTour.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		49CB4E56443B0BEB9A1717BD /* Explorer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Explorer.swift; sourceTree = "<group>"; };
 		4B20375CA36C0D0053B83EB8 /* house.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = house.json; sourceTree = "<group>"; };
+		4FDB628A5EBA795A694B2C8D /* Guide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Guide.swift; sourceTree = "<group>"; };
 		5AC1D059626107BBBAD52F7E /* FloorMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorMapView.swift; sourceTree = "<group>"; };
 		606613BD3866666F7A6302AA /* waterville.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = waterville.json; sourceTree = "<group>"; };
 		647B1763A463AD5E8B1B88F6 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		7584C442B9429D8BD356EE3D /* Transcript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transcript.swift; sourceTree = "<group>"; };
 		921CE0644165BD5E001C61F0 /* Tutorial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial.swift; sourceTree = "<group>"; };
 		97726DC77F77BDB6B8CF0F58 /* Speaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Speaker.swift; sourceTree = "<group>"; };
 		A143EF70857C37D6A5F629D4 /* House.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = House.swift; sourceTree = "<group>"; };
@@ -49,6 +54,7 @@
 		DD8302FC4803FC675FD26A29 /* Question.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Question.swift; sourceTree = "<group>"; };
 		E4EAF97DE339D78C06D10A2E /* LaptopViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaptopViewer.swift; sourceTree = "<group>"; };
 		E55EF84A62549EA506DB139E /* Listener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Listener.swift; sourceTree = "<group>"; };
+		F9AB57B6C201A7734E7D1F70 /* Directions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Directions.swift; sourceTree = "<group>"; };
 		FEB221226FD5067B140C5F3D /* AskButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskButton.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -67,8 +73,10 @@
 				647B1763A463AD5E8B1B88F6 /* AppModel.swift */,
 				FEB221226FD5067B140C5F3D /* AskButton.swift */,
 				28BC15A9016F922AA9E46FE4 /* ContentView.swift */,
+				F9AB57B6C201A7734E7D1F70 /* Directions.swift */,
 				49CB4E56443B0BEB9A1717BD /* Explorer.swift */,
 				5AC1D059626107BBBAD52F7E /* FloorMapView.swift */,
+				4FDB628A5EBA795A694B2C8D /* Guide.swift */,
 				20323A32ACEB9834D9B5D4D4 /* GuidedTour.swift */,
 				CA6205559AB34529A6D5F71B /* Haptics.swift */,
 				4B20375CA36C0D0053B83EB8 /* house.json */,
@@ -82,6 +90,7 @@
 				D49218E498142F628BB6217E /* Settings.swift */,
 				C43F3AA435F02D410B6ED1D3 /* SpatialAudio.swift */,
 				97726DC77F77BDB6B8CF0F58 /* Speaker.swift */,
+				7584C442B9429D8BD356EE3D /* Transcript.swift */,
 				921CE0644165BD5E001C61F0 /* Tutorial.swift */,
 				606613BD3866666F7A6302AA /* waterville.json */,
 			);
@@ -171,8 +180,10 @@
 				046BC60131507F9779BC23FD /* AppModel.swift in Sources */,
 				ACB2F0E0C9A7EC5CB445B590 /* AskButton.swift in Sources */,
 				4AD85D9CDA27E35F1B5D4002 /* ContentView.swift in Sources */,
+				A86D86821A059A5964794C11 /* Directions.swift in Sources */,
 				072A2B88A68063F8FA4C4C00 /* Explorer.swift in Sources */,
 				9C1D26E6A10778797E2EDC4F /* FloorMapView.swift in Sources */,
+				70A0F94CF6451F1622DB582F /* Guide.swift in Sources */,
 				0E766B0102E479D904CDA42C /* GuidedTour.swift in Sources */,
 				042A2688CA323100F0C005BE /* Haptics.swift in Sources */,
 				3BC2F77B0FFEB91E22CC442A /* House.swift in Sources */,
@@ -184,6 +195,7 @@
 				A9C23A64E395B2083A5A9DAE /* Settings.swift in Sources */,
 				B24F05755EF97BC3CFB87620 /* SpatialAudio.swift in Sources */,
 				B3ECE1753BE758E9865656B3 /* Speaker.swift in Sources */,
+				989A6A12292CC639AE4CFCBA /* Transcript.swift in Sources */,
 				B55141977668397901CAFCF3 /* Tutorial.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

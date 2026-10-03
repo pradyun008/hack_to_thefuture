@@ -10,6 +10,7 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     private let synth = AVSpeechSynthesizer()
     private var completions: [ObjectIdentifier: () -> Void] = [:]
     private var narrationUtterance: ObjectIdentifier?
+    private var narrationText = ""
     private var lastSaid: [String: Date] = [:]
 
     /// VoiceOver announcements still playing, oldest first. VoiceOver has no
@@ -26,6 +27,9 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     /// While the mic is open nothing is spoken, so the recognizer doesn't hear
     /// the app's own voice. Anything asked to be said meanwhile waits here.
     private var held: [() -> Void]?
+    /// Narration the mic cut off, said again once the answer is done. Its
+    /// completion goes with it, so the tour doesn't move on as if it was heard.
+    private var cutNarration: (text: String, done: (() -> Void)?)?
 
     override init() {
         super.init()
@@ -40,6 +44,8 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
 
     /// Every phrase actually spoken, for the laptop viewer's caption.
     var onSay: ((String) -> Void)?
+    /// A requested phrase dropped because something else was being said.
+    var onSkip: ((String) -> Void)?
 
     /// Something is being said or is waiting to be said.
     var isSpeaking: Bool {
@@ -90,7 +96,10 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         utterance.rate = 0.53
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
         if let completion { completions[ObjectIdentifier(utterance)] = completion }
-        if narration { narrationUtterance = ObjectIdentifier(utterance) }
+        if narration {
+            narrationUtterance = ObjectIdentifier(utterance)
+            narrationText = text
+        }
         synth.speak(utterance)
     }
 
@@ -99,7 +108,10 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     /// Returns false when it was dropped.
     @discardableResult
     func request(_ text: String) -> Bool {
-        guard !isSpeaking else { return false }
+        guard !isSpeaking else {
+            onSkip?(text)
+            return false
+        }
         say(text, interrupt: true)
         return true
     }
@@ -111,23 +123,42 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     /// The mic opened: cut off everything, narration included, and hold
-    /// anything new until `resume`.
+    /// anything new until `resume`. Narration is kept to say again after.
     func hold() {
+        let cut = takeNarration()
         held = []
         stop()
+        cutNarration = cut
     }
 
-    /// The mic closed. `first` says the answer, then whatever waited plays in
-    /// line behind it.
+    /// The mic closed. `first` says the answer, then the narration it cut off
+    /// (unless the answer stopped everything), then whatever waited.
     func resume(first: () -> Void) {
         let waiting = held ?? []
         held = nil
         first()
+        if let cut = cutNarration {
+            cutNarration = nil
+            say(cut.text, narration: true, completion: cut.done)
+        }
         waiting.forEach { $0() }
+    }
+
+    /// The narration playing now, with its completion taken out so cutting it
+    /// off doesn't run it.
+    private func takeNarration() -> (text: String, done: (() -> Void)?)? {
+        if UIAccessibility.isVoiceOverRunning {
+            guard let i = voiceOver.firstIndex(where: \.narration) else { return nil }
+            let item = voiceOver.remove(at: i)
+            return (item.text, item.done)
+        }
+        guard let id = narrationUtterance else { return nil }
+        return (narrationText, completions.removeValue(forKey: id))
     }
 
     /// Cuts off everything, narration included.
     func stop() {
+        cutNarration = nil
         narrationUtterance = nil
         synth.stopSpeaking(at: .immediate)
         flushVoiceOver()

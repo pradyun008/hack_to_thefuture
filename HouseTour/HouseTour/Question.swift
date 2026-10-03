@@ -7,14 +7,25 @@ enum Question: Equatable {
     case whereAmI
     case waysOut
     case frontDoor
+    /// How many steps, and which way, to a room. Said once.
     case room(floor: Int, index: Int)
+    /// Directions to a room, one leg per room walked into.
+    case guide(floor: Int, index: Int)
+    case listRooms
+    case aroundMe
+    case walls
+    case stop
+    /// Start the guided tour. There's no button for it, so it's asked aloud.
+    case tour
 
     /// Said when nothing matched, and as the button's hint.
-    static let examples = "Ask where am I, ways out, front door, or take me to a room."
+    static let examples = "Ask where am I, what's around me, list rooms, walls, take me to a room, or start the tour."
 
     /// Phrases to bias the recognizer toward: the questions and every room name.
     static func hints(for house: House) -> [String] {
-        ["where am I", "ways out", "front door", "take me to"] + house.floors.flatMap { $0.rooms.map(\.name) }
+        ["where am I", "ways out", "front door", "take me to", "guide me to", "how many steps to",
+         "list rooms", "what's around me", "landmarks", "walls", "stop", "start the tour"]
+            + house.floors.flatMap { $0.rooms.map(\.name) }
     }
 
     /// What was heard, matched to a question. Checked in order, so "how do I
@@ -23,12 +34,23 @@ enum Question: Equatable {
     static func match(_ heard: String, in house: House, from floor: Int, at p: CGPoint) -> Question? {
         let text = " " + normalize(heard)
         let has = { (phrases: [String]) in phrases.contains { text.contains(" " + $0) } }
+        if has(["stop", "cancel", "never mind", "nevermind"]) { return .stop }
+        if has(["tour", "show me around", "show me the house"]) { return .tour }
+        if has(["wall"]) { return .walls }
+        if has(["list", "all rooms", "all the rooms", "every room", "what rooms", "which rooms", "rooms are there",
+                "rooms on this floor", "how many rooms"]) {
+            return .listRooms
+        }
+        if has(["around", "nearby", "near me", "landmark", "next to me", "close to me", "surround"]) { return .aroundMe }
         if has(["front door", "main door", "entrance", "out of the house", "leave the house", "outside"]) {
             return .frontDoor
         }
         if has(["way out", "ways out", "exit", "get out", "leave", "door"]) { return .waysOut }
         if has(["where am i", "what room", "which room", "my location"]) { return .whereAmI }
-        if let room = room(in: text, house: house, from: floor, at: p) { return room }
+        if case let .room(f, i)? = room(in: text, house: house, from: floor, at: p) {
+            let guiding = has(["take me", "guide", "navigate", "bring me", "lead me", "walk me", "get me to"])
+            return guiding ? .guide(floor: f, index: i) : .room(floor: f, index: i)
+        }
         if has(["where"]) { return .whereAmI }
         return nil
     }

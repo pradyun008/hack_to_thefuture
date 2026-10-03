@@ -16,7 +16,9 @@ Haptics only work on a real device.
    destination, and press Run. Signing uses team `9XPPP9TMHQ`; change
    `DEVELOPMENT_TEAM` in `HouseTour/project.yml` for another account and run
    `xcodegen generate` in `HouseTour/`.
-3. First launch plays the haptic tutorial, then the guided tour. Plug in
+3. First launch plays the haptic tutorial, then leaves you free to explore
+   from the front door. Hold the bottom of the screen and say "start the tour"
+   for the guided tour. Plug in
    headphones to hear the front door chime in 3D.
 
 From the command line instead:
@@ -62,25 +64,30 @@ tap puts you back on at the nearest point.
   follow the system VoiceOver audio route.
 - Single tap: which room you're in. During the guided tour, the way to the next
   stop.
-- Double tap: leave the path, or rejoin it at the nearest point.
-- Triple tap: where you are. The room, how close you are to a wall, and the
-  nearest door and where it goes.
+- Triple tap: leave the path, or rejoin it at the nearest point. Each way has
+  its own vibration.
 - Hold still on the stairs, finger down, for about a second: change floors. On
   the path this hands you to the next storey's stretch of the route.
-- Taps and buttons never cut off speech. If something is being said, the
-  request is skipped; ask again when it's quiet.
-- One button: guided tour, which becomes "Stop tour" while it runs. The gear
+- Hold to ask, at the bottom: hold, speak, let go. It understands "where am
+  I", "ways out", "front door", "what's around me", "how far are the walls",
+  "list rooms" (rows from the top of the map, left to right), "how many steps
+  to the kitchen", "take me to the kitchen", and "start the tour". "Take me
+  to" gives the next leg every time you walk into a room, and "stop" ends it
+  or the tour. Directions are always from the way you face; on the path they
+  end with "Triple tap to leave the path." Off the path, a soft tick in one
+  ear says which way to turn until you face the way to go.
+- Taps cut off whatever is being said, except tour narration. Asking a
+  question during narration plays the narration again after the answer.
+- The gear
   opens settings, with a switch for each sound, vibration, and spoken cue,
   fine movement, "Show map" for people watching, and "Replay haptic
   tutorial". The House picker at the top of settings switches demo houses and
-  starts the new house's guided tour.
+  names the new house.
 
-The first launch plays the haptic tutorial, then starts the guided tour. You
-walk the tour yourself. It says where the next stop is and how many steps away,
-and plays that room's description when you get there. Stopping and starting
-the tour again puts you back at the front door. Once the tour has been
-finished, later launches go straight to free exploring; the guided tour button
-still starts it.
+Say "start the tour" to begin the guided tour. It puts you on the path at the
+front door, and you walk it yourself. It says where the next stop is and how
+many steps away, and plays that room's description when you get there.
+Starting the tour again puts you back at the front door.
 
 ## Laptop viewer
 
@@ -93,6 +100,19 @@ phone's Personal Hotspot works when campus Wi-Fi blocks device-to-device
 traffic), open the gear in the app, and open the address shown at the bottom
 in a browser. It's `http://<phone IP>:8080`. Turn off "Laptop viewer" in
 settings to stop the server.
+
+## Transcripts
+
+Every launch writes a transcript of the session: what you asked (as heard, and
+how it was understood), what you tapped, what the app said, and what it skipped
+because it was already talking, each tagged with the room you were in. Find
+them in the Files app under On My iPhone > House Tour > Transcripts, in the
+laptop viewer's side panel (with a Download link), or pull them over the cable:
+
+```sh
+xcrun devicectl device copy from --device <device id> --domain-type appDataContainer \
+  --domain-identifier com.edisonhui.housetour --source Documents/Transcripts --destination transcripts
+```
 
 ## Re-tracing the floor plan
 

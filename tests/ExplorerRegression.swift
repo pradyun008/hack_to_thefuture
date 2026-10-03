@@ -11,6 +11,7 @@ final class Haptics {
     func opening() {}
     func doorway() {}
     func fixture() {}
+    func path(on: Bool) {}
     func texture(_ type: FloorType) {}
 }
 final class SpatialAudio {
