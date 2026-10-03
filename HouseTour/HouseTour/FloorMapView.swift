@@ -2,18 +2,18 @@ import Combine
 import SwiftUI
 import UIKit
 
-/// The touch surface, used like a laptop trackpad. One finger drags the avatar
-/// by the finger's movement, never to where the finger is, so seeing the map
-/// gives no shortcut. Single tap says the room; double tap steps off the route
-/// or snaps back onto it; triple tap says where you are. Extra fingers are
-/// ignored so a second one can't drag the avatar. Marked
+/// The touch surface, used like a joystick. Where the finger lands becomes the
+/// stick's centre, and holding it above or below walks forward or back, never
+/// to where the finger is, so seeing the map gives no shortcut. Single tap says
+/// the room; triple tap steps off the route
+/// or snaps back onto it. Extra fingers are ignored so a second one can't drag
+/// the avatar. Marked
 /// `allowsDirectInteraction` so raw touches reach it while VoiceOver is on.
 final class FloorMapView: UIView {
     var explorer: Explorer!
     var onTouch: (() -> Void)?
     var onSingleTap: (() -> Void)?
-    var onToggleRail: (() -> Void)?
-    var onWhereAmI: (() -> Void)?
+    var onTripleTap: (() -> Void)?
 
     /// Top walking speed, in feet per second, at full deflection. A house is
     /// about 60 ft across, so crossing it takes roughly 20 seconds: a walk, not
@@ -71,7 +71,7 @@ final class FloorMapView: UIView {
         pointer.lineJoin = .round
         layer.addSublayer(pointer)
 
-        hint.text = "Hold and push up to walk. Double tap: leave the path or rejoin it. Triple tap: where you are."
+        hint.text = "Hold and push up to walk. Triple tap: leave the path or rejoin it."
         hint.textColor = UIColor(white: 0.6, alpha: 1)
         hint.font = .preferredFont(forTextStyle: .body)
         hint.numberOfLines = 0
@@ -87,7 +87,7 @@ final class FloorMapView: UIView {
 
         isAccessibilityElement = true
         accessibilityLabel = "Touch surface"
-        accessibilityHint = "Turn your head with AirPods to face left or right. Press and hold, then push up to walk forward or down to walk back. Further is faster. Single tap for the room. Double tap to leave the path or rejoin it. Triple tap for where you are."
+        accessibilityHint = "Turn your head with AirPods to face left or right. Press and hold, then push up to walk forward or down to walk back. Further is faster. Single tap for the room. Triple tap to leave the path or rejoin it. Hold the bottom of the screen to ask a question."
         accessibilityTraits = .allowsDirectInteraction
     }
 
@@ -245,18 +245,17 @@ final class FloorMapView: UIView {
         tapTimes = tapTimes.filter { now.timeIntervalSince($0) < 0.9 } + [now]
         if tapTimes.count >= 3 {
             tapTimes = []
-            onWhereAmI?()
+            onTripleTap?()
             return
         }
         // Wait to see whether more taps follow. Each new tap cancels the wait,
-        // so only the final count acts: one tap says the room, two step off the
-        // route or rejoin it, and three (above) say where you are.
+        // so only the final count acts: one tap says the room, and three (above)
+        // step off the route or rejoin it. Two do nothing.
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             let count = self.tapTimes.count
             self.tapTimes = []
             if count == 1 { self.onSingleTap?() }
-            if count == 2 { self.onToggleRail?() }
         }
         announceWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
@@ -358,8 +357,7 @@ struct FloorMap: UIViewRepresentable {
         view.explorer = app.explorer
         view.onTouch = { app.interrupt() }
         view.onSingleTap = { app.singleTap() }
-        view.onToggleRail = { app.toggleRail() }
-        view.onWhereAmI = { app.explorer.whereAmI() }
+        view.onTripleTap = { app.toggleRail() }
         context.coordinator.positionSink = app.explorer.$position.map { _ in () }
             .merge(with: app.explorer.$heading.map { _ in () })
             .receive(on: DispatchQueue.main)

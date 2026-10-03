@@ -73,7 +73,7 @@ struct SettingsView: View {
                         ForEach(DemoHouse.allCases) { Text($0.title).tag($0) }
                     }
                 } footer: {
-                    Text("Switching houses starts its guided tour.")
+                    Text("Switching houses starts you in free roam at its front door.")
                 }
                 Section {
                     Button("Calibrate forward", action: calibrateForward)

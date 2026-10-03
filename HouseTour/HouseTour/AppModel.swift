@@ -38,7 +38,7 @@ final class AppModel: ObservableObject {
         let demo = DemoHouse.current
         let house = House.bundled(demo)
         let audio = SpatialAudio(frontDoor: house.frontDoor.point)
-        let explorer = Explorer(house: house, haptics: haptics, audio: audio, speech: speech)
+        let explorer = Explorer(house: house, haptics: haptics, audio: audio, speech: speech, onRail: false)
         self.house = house
         self.audio = audio
         self.explorer = explorer
@@ -74,8 +74,8 @@ final class AppModel: ObservableObject {
         explorer.$onRail.sink { on in viewer.update { $0.onRail = on } }.store(in: &houseBag)
     }
 
-    /// Swaps in another bundled house and starts its guided tour, since every
-    /// room in it is new.
+    /// Swaps in another bundled house and names it. You start in free roam at
+    /// its front door; the guided tour waits for its button.
     func switchHouse(to demo: DemoHouse) {
         stopTutorial()
         if tourRunning {
@@ -86,11 +86,11 @@ final class AppModel: ObservableObject {
         house = House.bundled(demo)
         audio.moveBeacon(to: house.frontDoor.point)
         let headHeading = explorer.headHeading
-        explorer = Explorer(house: house, haptics: haptics, audio: audio, speech: speech)
+        explorer = Explorer(house: house, haptics: haptics, audio: audio, speech: speech, onRail: false)
         if let headHeading { explorer.faceHead(headHeading) }
         tour = GuidedTour(explorer: explorer, speech: speech)
         connectHouse(demo)
-        startTour(preface: "\(house.address). \(house.summary)")
+        speech.request("\(house.address). \(house.summary)")
     }
 
     /// Mirror the tour state and speech to the laptop viewer, and start or stop
@@ -130,19 +130,10 @@ final class AppModel: ObservableObject {
         if tutorialRunning { stopTutorial() }
     }
 
-    /// First launch: the haptic tutorial, then the guided tour. Later launches
-    /// start the tour only if it was never finished.
+    /// First launch: the haptic tutorial. Every launch starts in free roam; the
+    /// guided tour waits for its button.
     func firstLaunch(tutorial: Bool) {
-        if tutorial {
-            runTutorial { [weak self] in self?.startTourIfNew() }
-        } else {
-            startTourIfNew()
-        }
-    }
-
-    private func startTourIfNew() {
-        guard !UserDefaults.standard.bool(forKey: Self.didTourKey), !tourRunning else { return }
-        startTour()
+        if tutorial { runTutorial() }
     }
 
     func toggleTour() {
@@ -156,6 +147,8 @@ final class AppModel: ObservableObject {
 
     private func startTour(preface: String? = nil) {
         stopTutorial()
+        // The tour walks the route, so it starts by putting you on it.
+        if !explorer.onRail { explorer.toggleRail() }
         tourRunning = true
         tour.start(preface: preface)
     }
@@ -165,7 +158,7 @@ final class AppModel: ObservableObject {
         tourRunning ? tour.repeatGuidance() : explorer.announceLocation()
     }
 
-    /// Double tap on the touch surface: leave the fixed route, or snap back to it.
+    /// Triple tap on the touch surface: leave the fixed route, or snap back to it.
     func toggleRail() {
         interrupt()
         explorer.toggleRail()

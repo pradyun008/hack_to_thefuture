@@ -227,7 +227,7 @@ final class GuidedTour {
         running = false
         timer?.invalidate()
         timer = nil
-        speech.say("End of the tour. You're still on the path. Double tap to step off or back on, triple tap for where you are.")
+        speech.say("End of the tour. You're still on the path. Triple tap to step off or back on.")
         onFinish?()
     }
 }
