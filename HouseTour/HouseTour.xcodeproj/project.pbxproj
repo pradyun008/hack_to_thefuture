@@ -12,13 +12,16 @@
 		054CC183818B4E2259262937 /* HouseTourApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C518FAA526602A2B5C05DB5E /* HouseTourApp.swift */; };
 		072A2B88A68063F8FA4C4C00 /* Explorer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49CB4E56443B0BEB9A1717BD /* Explorer.swift */; };
 		0E766B0102E479D904CDA42C /* GuidedTour.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20323A32ACEB9834D9B5D4D4 /* GuidedTour.swift */; };
-		0F1E2D3C4B5A6978879605A4 /* Rail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F607182930A4B5 /* Rail.swift */; };
+		2D0E560BC75EA54360084FD4 /* Question.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD8302FC4803FC675FD26A29 /* Question.swift */; };
+		2D1149F25D6F0AD0E2577314 /* Rail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6F41A5A3C18FEAFED8E41E1 /* Rail.swift */; };
 		2EC78661B95769C1E414A390 /* LaptopViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EAF97DE339D78C06D10A2E /* LaptopViewer.swift */; };
 		3BC2F77B0FFEB91E22CC442A /* House.swift in Sources */ = {isa = PBXBuildFile; fileRef = A143EF70857C37D6A5F629D4 /* House.swift */; };
 		4AD85D9CDA27E35F1B5D4002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BC15A9016F922AA9E46FE4 /* ContentView.swift */; };
 		9C1D26E6A10778797E2EDC4F /* FloorMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AC1D059626107BBBAD52F7E /* FloorMapView.swift */; };
+		9CBE8271FE98B33F645AC636 /* Listener.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55EF84A62549EA506DB139E /* Listener.swift */; };
 		A13D0A02774BCB3211902D72 /* house.json in Resources */ = {isa = PBXBuildFile; fileRef = 4B20375CA36C0D0053B83EB8 /* house.json */; };
 		A9C23A64E395B2083A5A9DAE /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D49218E498142F628BB6217E /* Settings.swift */; };
+		ACB2F0E0C9A7EC5CB445B590 /* AskButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB221226FD5067B140C5F3D /* AskButton.swift */; };
 		B24F05755EF97BC3CFB87620 /* SpatialAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = C43F3AA435F02D410B6ED1D3 /* SpatialAudio.swift */; };
 		B3ECE1753BE758E9865656B3 /* Speaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97726DC77F77BDB6B8CF0F58 /* Speaker.swift */; };
 		B55141977668397901CAFCF3 /* Tutorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 921CE0644165BD5E001C61F0 /* Tutorial.swift */; };
@@ -38,12 +41,15 @@
 		921CE0644165BD5E001C61F0 /* Tutorial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial.swift; sourceTree = "<group>"; };
 		97726DC77F77BDB6B8CF0F58 /* Speaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Speaker.swift; sourceTree = "<group>"; };
 		A143EF70857C37D6A5F629D4 /* House.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = House.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F607182930A4B5 /* Rail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rail.swift; sourceTree = "<group>"; };
+		B6F41A5A3C18FEAFED8E41E1 /* Rail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rail.swift; sourceTree = "<group>"; };
 		C43F3AA435F02D410B6ED1D3 /* SpatialAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAudio.swift; sourceTree = "<group>"; };
 		C518FAA526602A2B5C05DB5E /* HouseTourApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseTourApp.swift; sourceTree = "<group>"; };
 		CA6205559AB34529A6D5F71B /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		D49218E498142F628BB6217E /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
+		DD8302FC4803FC675FD26A29 /* Question.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Question.swift; sourceTree = "<group>"; };
 		E4EAF97DE339D78C06D10A2E /* LaptopViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaptopViewer.swift; sourceTree = "<group>"; };
+		E55EF84A62549EA506DB139E /* Listener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Listener.swift; sourceTree = "<group>"; };
+		FEB221226FD5067B140C5F3D /* AskButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskButton.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -59,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				647B1763A463AD5E8B1B88F6 /* AppModel.swift */,
+				FEB221226FD5067B140C5F3D /* AskButton.swift */,
 				28BC15A9016F922AA9E46FE4 /* ContentView.swift */,
 				49CB4E56443B0BEB9A1717BD /* Explorer.swift */,
 				5AC1D059626107BBBAD52F7E /* FloorMapView.swift */,
@@ -69,7 +76,9 @@
 				C518FAA526602A2B5C05DB5E /* HouseTourApp.swift */,
 				18F801ED1F0A6FA7CE2F86CA /* Info.plist */,
 				E4EAF97DE339D78C06D10A2E /* LaptopViewer.swift */,
-				A1B2C3D4E5F607182930A4B5 /* Rail.swift */,
+				E55EF84A62549EA506DB139E /* Listener.swift */,
+				DD8302FC4803FC675FD26A29 /* Question.swift */,
+				B6F41A5A3C18FEAFED8E41E1 /* Rail.swift */,
 				D49218E498142F628BB6217E /* Settings.swift */,
 				C43F3AA435F02D410B6ED1D3 /* SpatialAudio.swift */,
 				97726DC77F77BDB6B8CF0F58 /* Speaker.swift */,
@@ -160,6 +169,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				046BC60131507F9779BC23FD /* AppModel.swift in Sources */,
+				ACB2F0E0C9A7EC5CB445B590 /* AskButton.swift in Sources */,
 				4AD85D9CDA27E35F1B5D4002 /* ContentView.swift in Sources */,
 				072A2B88A68063F8FA4C4C00 /* Explorer.swift in Sources */,
 				9C1D26E6A10778797E2EDC4F /* FloorMapView.swift in Sources */,
@@ -168,7 +178,9 @@
 				3BC2F77B0FFEB91E22CC442A /* House.swift in Sources */,
 				054CC183818B4E2259262937 /* HouseTourApp.swift in Sources */,
 				2EC78661B95769C1E414A390 /* LaptopViewer.swift in Sources */,
-				0F1E2D3C4B5A6978879605A4 /* Rail.swift in Sources */,
+				9CBE8271FE98B33F645AC636 /* Listener.swift in Sources */,
+				2D0E560BC75EA54360084FD4 /* Question.swift in Sources */,
+				2D1149F25D6F0AD0E2577314 /* Rail.swift in Sources */,
 				A9C23A64E395B2083A5A9DAE /* Settings.swift in Sources */,
 				B24F05755EF97BC3CFB87620 /* SpatialAudio.swift in Sources */,
 				B3ECE1753BE758E9865656B3 /* Speaker.swift in Sources */,

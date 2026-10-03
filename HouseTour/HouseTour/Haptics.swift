@@ -107,6 +107,11 @@ final class Haptics {
         }
     }
 
+    /// The mic opening (a swell) or closing (a fade), for the hold-to-talk button.
+    func listening(_ on: Bool) {
+        play([buzz(0, 0.2, 0.7, 0.6, attack: on ? 0.18 : 0, release: on ? 0 : 0.18)])
+    }
+
     /// Continuous hum that rises as the avatar nears a wall. 0 turns it off.
     func proximity(_ level: Float) {
         guard engine != nil else { return }

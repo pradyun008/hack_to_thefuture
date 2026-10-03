@@ -264,6 +264,77 @@ final class Explorer: ObservableObject {
         speech.request(parts.joined(separator: ". ") + ".")
     }
 
+    /// Asked aloud: every way out of the room, nearest first, and where each
+    /// goes. Closets aren't ways out, so they're left out unless there's
+    /// nothing else. "Kitchen, 2 ways out. Opening to Dining area on your
+    /// right, 2 steps. Door to Hall behind you, 6 steps."
+    func waysOut() {
+        let p = position
+        guard let room = currentRoom else {
+            speech.request("Outside the house. " + frontDoorDirections())
+            return
+        }
+        let doors = floor.doors.indices.filter { floor.doors[$0].a == room || floor.doors[$0].b == room }
+        let open = doors.filter { !leadsToCloset($0, from: room) }
+        let exits = (open.isEmpty ? doors : open)
+            .sorted { floor.distance(toDoor: $0, from: p) < floor.distance(toDoor: $1, from: p) }
+        let name = floor.rooms[room].name
+        guard !exits.isEmpty else {
+            speech.request("\(name). No doors out.")
+            return
+        }
+        // Four is plenty to hold in your head; the rest are farther anyway.
+        let list = exits.prefix(4).map {
+            "\(doorName(floor.doors[$0], from: room)) \(place(from: p, to: floor.nearestPoint(onDoor: $0, from: p), heading: heading))"
+        }
+        let count = exits.count == 1 ? "1 way out" : "\(exits.count) ways out"
+        speech.request("\(name), \(count). " + list.joined(separator: ". ") + ".")
+    }
+
+    /// Asked aloud: the way to the front door, by way of the stairs when it's
+    /// on the other floor.
+    func wayToFrontDoor() {
+        speech.request(frontDoorDirections())
+    }
+
+    /// Asked aloud: the way to a room, by way of the stairs when it's on the
+    /// other floor. "Kitchen. Through the door to Hall ahead, 4 steps."
+    func wayTo(room index: Int, onFloor f: Int) {
+        let target = house.floors[f].rooms[index]
+        guard f == floorIndex else {
+            speech.request("\(target.name), \(house.floors[f].name.lowercased()). " + stairsDirections(up: f > floorIndex))
+            return
+        }
+        guard index != currentRoom else {
+            speech.request("You're in the \(target.name).")
+            return
+        }
+        let center = CGPoint(x: target.rect.midX, y: target.rect.midY)
+        let spot = target.isStairs ? house.stairLanding ?? center : center
+        speech.request("\(target.name). " + route(to: spot, room: index))
+    }
+
+    /// "Front door. Through the door to Foyer ahead, 4 steps."
+    private func frontDoorDirections() -> String {
+        let front = house.frontDoor
+        guard front.floor == floorIndex else {
+            return "Front door, \(house.floors[front.floor].name.lowercased()). " + stairsDirections(up: front.floor > floorIndex)
+        }
+        guard let i = floor.doors.firstIndex(where: \.isFront) else {
+            return "Front door. " + route(to: front.point, room: nil)
+        }
+        let door = floor.doors[i]
+        return "Front door. " + route(to: floor.nearestPoint(onDoor: i, from: position), room: door.a >= 0 ? door.a : door.b)
+    }
+
+    /// The way to this floor's stairs, or how to use them when already on them.
+    private func stairsDirections(up: Bool) -> String {
+        if isOnStairs { return up ? "Hold still on the stairs to climb." : "Hold still on the stairs to go down." }
+        guard let s = floor.stairsIndex else { return "" }
+        let r = floor.rooms[s].rect
+        return route(to: house.stairLanding ?? CGPoint(x: r.midX, y: r.midY), room: s, name: "Stairs")
+    }
+
     /// How to get to `target` in room `room` on this floor: through the first
     /// door on the way when it's in another room, otherwise straight there.
     /// `name` is the goal's name when the caller hasn't just said it. When it
@@ -620,18 +691,20 @@ final class Explorer: ObservableObject {
     /// The front door is left out; it always gets its own sentence.
     private func nearbyDoors(_ p: CGPoint) -> [Int] {
         let here = currentRoom ?? -1
-        let isCloset = { (i: Int) -> Bool in
-            let d = self.floor.doors[i]
-            let other = d.a == here ? d.b : d.a
-            return other >= 0 && self.floor.rooms[other].isCloset
-        }
         let doors = floor.doors.indices
             .filter { (floor.doors[$0].a == here || floor.doors[$0].b == here) && !floor.doors[$0].isFront }
             .sorted { floor.distance(toDoor: $0, from: p) < floor.distance(toDoor: $1, from: p) }
-        let main = doors.filter { !isCloset($0) }
+        let main = doors.filter { !leadsToCloset($0, from: here) }
         guard let first = main.first else { return Array(doors.prefix(1)) }
         if main.count > 1, floor.distance(toDoor: main[1], from: p) <= 10 { return [first, main[1]] }
         return [first]
+    }
+
+    /// Door `i` opens from room `here` into a closet.
+    private func leadsToCloset(_ i: Int, from here: Int) -> Bool {
+        let d = floor.doors[i]
+        let other = d.a == here ? d.b : d.a
+        return other >= 0 && floor.rooms[other].isCloset
     }
 
     /// "Wall on your left", turned to the way you're facing.

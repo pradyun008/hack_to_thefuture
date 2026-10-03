@@ -23,6 +23,10 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     }
     private var voiceOver: [Announcement] = []
 
+    /// While the mic is open nothing is spoken, so the recognizer doesn't hear
+    /// the app's own voice. Anything asked to be said meanwhile waits here.
+    private var held: [() -> Void]?
+
     override init() {
         super.init()
         synth.delegate = self
@@ -52,6 +56,11 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     /// seconds. `narration` marks tour narration, which nothing but `stop()` cuts off.
     func say(_ text: String, interrupt: Bool = false, dedupe: TimeInterval = 0, narration: Bool = false,
              completion: (() -> Void)? = nil) {
+        if held != nil {
+            // Without `interrupt`, so it lines up behind the answer.
+            held?.append { [weak self] in self?.say(text, dedupe: dedupe, narration: narration, completion: completion) }
+            return
+        }
         if dedupe > 0, let last = lastSaid[text], Date().timeIntervalSince(last) < dedupe {
             completion?()
             return
@@ -99,6 +108,22 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         await withCheckedContinuation { cont in
             say(text, interrupt: true) { cont.resume() }
         }
+    }
+
+    /// The mic opened: cut off everything, narration included, and hold
+    /// anything new until `resume`.
+    func hold() {
+        held = []
+        stop()
+    }
+
+    /// The mic closed. `first` says the answer, then whatever waited plays in
+    /// line behind it.
+    func resume(first: () -> Void) {
+        let waiting = held ?? []
+        held = nil
+        first()
+        waiting.forEach { $0() }
     }
 
     /// Cuts off everything, narration included.

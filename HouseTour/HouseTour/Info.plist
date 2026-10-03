@@ -22,6 +22,10 @@
 	<string>1</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Lets a laptop on the same Wi-Fi show the floor plan live while you explore.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Hears your question while you hold the Ask button, like where am I or ways out.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turns the question you ask into text so House Tour can answer it.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
