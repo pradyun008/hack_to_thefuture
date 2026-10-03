@@ -8,6 +8,37 @@ Lifting and touching again never moves it, so nobody can aim at a door they
 can see. Walls, windows, screens, and railings stop the avatar, and pushing
 diagonally into a wall slides along it.
 
+## On the path
+
+Free movement in two dimensions is where a blind explorer gets lost. A swipe
+across an empty 20 ft family room gives nothing back — no wall, no door, no
+landmark — and there is no way to recover except hunting for an edge. So by
+default the avatar is locked to a **path**: the hand-written route through
+every room, the same polyline the guided tour walks, which the tracer already
+proves never crosses a wall.
+
+On the path there is one degree of freedom. The finger's movement is projected
+onto the route's own direction: dragging onward walks onward, dragging back
+retraces, and a sideways drag does nothing instead of grinding into a wall. The
+heading is the route's direction, updated as you go, so "drag up" keeps meaning
+"onward" around a corner — there is no spin risk the way there is in open floor,
+because on a track a sideways drag cannot turn you. The two ends of the route
+knock like walls, because that is where it runs out.
+
+A double tap steps off the path, for feeling out a room properly; walls stop
+you as usual and the heading goes back to the way you walked. Another double tap
+snaps you to the nearest point of the route and locks you to it again.
+
+The route doubles back on itself — out to the half bath and in again along
+nearly the same line — so one spot on the floor can be two places on the route,
+40 ft apart along it. Snapping back prefers the pass you were already on, and
+tour stops are found by their step number rather than their coordinates, so
+"Jump to room" and "ahead along the path" can't end up facing backwards.
+
+While on the path the tour gives distances along it ("It's ahead along the path,
+about 4 steps") instead of bearings, since a bearing is noise when there is
+nowhere to go but forward and back.
+
 The avatar faces the way it last walked, and the trackpad turns with it:
 finger up walks ahead, finger right walks to your right, finger down backs up.
 The heading holds still while the finger is down, so a sideways drag can't
@@ -35,7 +66,7 @@ everything-on overwhelming.
 | Switch | Default |
 |---|---|
 | Wall approach hum | Off |
-| Front door chime while touching | Off (triple tap plays it for 6 s anyway) |
+| Front door chime while touching | Off (the find front door button plays it for 6 s anyway) |
 | Floor texture vibration | On |
 | Wind sound outside | Off |
 | Speak room names | On |
@@ -70,7 +101,7 @@ numbs the hand. There is no footstep sound; floors are felt only.
 
 | Sound | What it tells you | When |
 |---|---|---|
-| Front door beacon | Direction and distance to the entrance | Two-note chime every 1.5 s, placed in 3D at the door. While touching if switched on. Triple tap plays it louder for 6 s either way |
+| Front door beacon | Direction and distance to the entrance | Two-note chime every 1.5 s, placed in 3D at the door. While touching if switched on. The find front door button plays it louder for 6 s either way |
 | Front door chime | You're at the front door | Once per arrival |
 | Wind | You've left the house | Only if switched on |
 
@@ -87,13 +118,17 @@ and fixture names are dropped while it plays, since they'd be stale by the end.
 | Entering a room | Name, size, floor | "Kitchen. 14 by 13 feet. Tile." |
 | Standing in a door | Where it goes | "Door to Kitchen." "Opening to Dining area." "Front door." |
 | Single tap | The room | "Living room." |
-| Double tap | Room and floor, nearest doors and where they go, nearest built-in or the stairs, the front door | "Kitchen, first floor. The opening to Dining area is on your right, about 2 steps. The stairs are behind you on your left, about 6 steps. The front door is behind you, about 7 steps." |
-| Two-finger tap | Floor, room, nearest wall, floor type, way to the front door | "First floor, Kitchen. Near the wall on your left. Tile. The front door is behind you on your right, about 7 steps." |
-| Triple tap | Way to the front door | "The front door is behind you, about 5 steps. Follow the chime." |
+| Double tap | Leaving the path, or rejoining it | "Off the path. Explore freely. Double tap to come back." "Back on the path. Kitchen." |
+| Triple tap | Floor, room, nearest wall, nearest door | "First floor, Kitchen. Near the wall on your left. The opening to Dining area is on your right, about 2 steps." |
+| Find front door button | Way to the front door | "The front door is behind you, about 5 steps. Follow the chime." |
 | Stairs | Direction and how to use them | "Stairs going up. Hold still to climb." |
 | Guided tour | The next stop and how to get there | "Next stop, Kitchen. Go through the door to Kitchen, ahead on your right, about 3 steps." |
 
-Outside the guided tour and the double tap, nothing gives directions to
+Three facts is the whole of "where you are": the room, the nearest wall, and the
+nearest door. Floor type and the front door are left out because a tap cannot
+cut speech off, so every extra clause is time the user is stuck waiting; the
+floor type is still given on the way into a room, where it competes with
+nothing. Outside the guided tour and that answer, nothing gives directions to
 interior doors. You learn a door is there by reaching it. A room is announced only after the avatar has been in it for
 0.35 s or moved 1 ft past the boundary, so wiggling across a doorway doesn't
 chatter.
@@ -114,9 +149,12 @@ chatter.
    and a single tap asks for them. To change floors you hold still on the
    stairs as usual. "Previous room" aims back one stop, "Restart tour" returns
    to the front door, and "Jump to room" moves you to any stop and plays it.
+   Because the tour's stops all lie on the path, walking the path walks the
+   tour: the two cannot disagree about where a stop is.
    Finishing the tour is remembered, so later launches start in free explore.
-3. **Free explore.** Drag to walk. "Fine movement" makes each swipe go a third
-   as far, for lining up with a narrow doorway.
+3. **Free explore.** Drag to walk, along the path or, after a double tap, in
+   any direction. "Fine movement" makes each swipe go a third as far, for
+   lining up with a narrow doorway.
 
 ## Where the data comes from
 
@@ -132,5 +170,7 @@ chatter.
 - The phone vibrates as one unit, so left and right come only from audio.
 - The "Go upstairs" button puts you on the stairs. Climbing by holding still
   keeps your spot.
+- The path is the tour's route, so it reaches every narrated room but not every
+  corner of every room. Stepping off is how you reach the rest.
 - No phone-rotation or AirPods head tracking yet. Ahead is the avatar's
   walking direction, not the way the user's head or phone points.

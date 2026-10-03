@@ -15,6 +15,7 @@ final class LaptopViewer {
         var room = ""
         var house = ""     // which house file is loaded; the page refetches it when this changes
         var touring = false
+        var onRail = true  // the avatar is locked to the route
         var said = ""
         var saidAt = 0.0   // seconds since 1970, so the page can fade old lines
     }
@@ -176,6 +177,7 @@ function draw(s) {
     ctx.fillStyle = "#2ecc71";
     ctx.fillRect(house.frontDoor.x * ft - 18, house.frontDoor.y * ft - 7, 36, 14);
   }
+  drawRoute(s.floor, ft);
   ctx.strokeStyle = "rgba(231, 76, 60, 0.5)"; ctx.lineWidth = 4; ctx.beginPath();
   trail.forEach((p, i) => i ? ctx.lineTo(p.x * ft, p.y * ft) : ctx.moveTo(p.x * ft, p.y * ft));
   ctx.stroke();
@@ -188,6 +190,33 @@ function draw(s) {
   ctx.lineJoin = "round"; ctx.fill(); ctx.stroke();
 }
 
+// The fixed route the avatar is locked to. It's house.tour, the same polyline
+// the app rails on, so this is the route itself and not a drawing of it. Shown
+// from page load, before anyone moves, so a tester can see where the path goes.
+function drawRoute(floor, ft) {
+  const steps = house.tour.filter(p => p.floor === floor);
+  if (steps.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = "rgba(46, 134, 222, 0.85)";
+  ctx.lineWidth = 6;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.setLineDash([14, 9]);
+  ctx.beginPath();
+  steps.forEach((p, i) => i ? ctx.lineTo(p.x * ft, p.y * ft) : ctx.moveTo(p.x * ft, p.y * ft));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Narrated stops sit a little larger than the plain corners.
+  for (const p of steps) {
+    ctx.beginPath();
+    ctx.arc(p.x * ft, p.y * ft, p.say ? 7 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = p.say ? "#2e86de" : "rgba(46, 134, 222, 0.6)";
+    ctx.fill();
+    if (p.say) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
 async function poll() {
   try {
     const s = await (await fetch("/state", { cache: "no-store" })).json();
@@ -198,7 +227,9 @@ async function poll() {
     if (trail.length > 600) trail.shift();
     document.getElementById("room").textContent = s.room || "Outside";
     document.getElementById("floor").textContent = house.floors[s.floor].name;
-    document.getElementById("status").textContent = s.touring ? "Guided tour" : "";
+    document.getElementById("status").textContent =
+      [s.touring ? "Guided tour" : "", s.onRail ? "On the path" : "Off the path"]
+        .filter(Boolean).join(" \u00b7 ");
     const said = document.getElementById("said");
     said.textContent = s.said ? '"' + s.said + '"' : "";
     said.style.opacity = Date.now() / 1000 - s.saidAt < 6 ? 1 : 0.25;
