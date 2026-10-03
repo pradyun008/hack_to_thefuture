@@ -5,6 +5,9 @@ import CoreHaptics
 /// just intensity, because small sharpness changes are hard to tell apart.
 final class Haptics {
     private var engine: CHHapticEngine?
+    /// Every pattern played, by name and peak strength, for the laptop viewer's
+    /// haptic panel. Called even where nothing can vibrate, like the simulator.
+    var onPlay: ((String, Float) -> Void)?
     private var hum: CHHapticAdvancedPatternPlayer?
     private var humOn = false
     private var lastHumUpdate = Date.distantPast
@@ -109,17 +112,18 @@ final class Haptics {
     /// stays low, so strength can be raised with `stepGain` without blurring it.
     func texture(_ floor: FloorType) {
         let g = Self.stepGain
+        let step = "Footstep · \(floor.rawValue.capitalized)"
         switch floor {
         case .carpet:    // no hits at all: one soft smooth swell
-            play([buzz(0, 0.18, 0.4 * g, 0.05, attack: 0.07, release: 0.08)])
+            play(name: step, [buzz(0, 0.18, 0.4 * g, 0.05, attack: 0.07, release: 0.08)])
         case .concrete:  // flat gritty scrape: hard-edged, no swell, no taps
-            play([buzz(0, 0.15, 0.45 * g, 0.35, release: 0.02)])
+            play(name: step, [buzz(0, 0.15, 0.45 * g, 0.35, release: 0.02)])
         case .tile:      // two short smooth pulses, far apart: mm ... mm
-            play([buzz(0, 0.04, 0.4 * g, 0.5, release: 0.02), buzz(0.15, 0.04, 0.4 * g, 0.5, release: 0.02)])
+            play(name: step, [buzz(0, 0.04, 0.4 * g, 0.5, release: 0.02), buzz(0.15, 0.04, 0.4 * g, 0.5, release: 0.02)])
         case .hardwood:  // three fast light ticks, fading: tk-tk-tk
-            play([tap(0, 0.4 * g, 0.45), tap(0.06, 0.33 * g, 0.45), tap(0.12, 0.26 * g, 0.45)])
+            play(name: step, [tap(0, 0.4 * g, 0.45), tap(0.06, 0.33 * g, 0.45), tap(0.12, 0.26 * g, 0.45)])
         case .deck:      // long then short: a hollow drone, then a dull knock
-            play([buzz(0, 0.09, 0.45 * g, 0.2), tap(0.15, 0.45 * g, 0.3)])
+            play(name: step, [buzz(0, 0.09, 0.45 * g, 0.2), tap(0.15, 0.45 * g, 0.3)])
         case .unknown:
             break
         }
@@ -158,6 +162,16 @@ final class Haptics {
         }
     }
 
+    /// "wall()" to "Wall knock": the caller's name, as the viewer shows it.
+    private static func label(_ caller: String) -> String {
+        let base = String(caller.prefix { $0 != "(" })
+        let names = ["wall": "Wall knock", "window": "Window", "screen": "Screen", "railing": "Railing",
+                     "doorway": "Doorway", "opening": "Opening", "frontDoor": "Front door",
+                     "fixture": "Fixture", "stairs": "Stairs", "listening": "Mic",
+                     "facing": "Facing the guide", "path": "Path on / off"]
+        return names[base] ?? base
+    }
+
     // MARK: Building blocks
 
     private func tap(_ time: Double, _ intensity: Float, _ sharpness: Float) -> CHHapticEvent {
@@ -177,7 +191,9 @@ final class Haptics {
         ], relativeTime: time, duration: duration)
     }
 
-    private func play(_ events: [CHHapticEvent]) {
+    private func play(name: String = #function, _ events: [CHHapticEvent]) {
+        let peak = events.compactMap { $0.eventParameters.first { $0.parameterID == .hapticIntensity }?.value }.max() ?? 0
+        onPlay?(Self.label(name), min(peak, 1))
         guard let engine else { return }
         do {
             let player = try engine.makePlayer(with: CHHapticPattern(events: events, parameters: []))

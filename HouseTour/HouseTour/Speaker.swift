@@ -164,8 +164,12 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         flushVoiceOver()
     }
 
-    func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) { finish(u) }
-    func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) { finish(u) }
+    /// Talking started or stopped, for the laptop viewer's sound panel.
+    var onSpeaking: ((Bool) -> Void)?
+
+    func speechSynthesizer(_ s: AVSpeechSynthesizer, didStart u: AVSpeechUtterance) { onSpeaking?(true) }
+    func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) { onSpeaking?(false); finish(u) }
+    func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) { onSpeaking?(false); finish(u) }
 
     private func finish(_ u: AVSpeechUtterance) {
         let id = ObjectIdentifier(u)
