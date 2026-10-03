@@ -58,19 +58,18 @@ tap puts you back on at the nearest point.
   the path this hands you to the next storey's stretch of the route.
 - Taps and buttons never cut off speech. If something is being said, the
   request is skipped; ask again when it's quiet.
-- Buttons: guided tour, where am I, go up or downstairs, fine movement, find
-  front door (which also plays the beacon for a few seconds), haptic tutorial. The gear opens settings, with a switch for each
-  sound, vibration, and spoken cue, plus "Show map" for people watching. The
-  House picker at the top of settings switches demo houses and starts the new
-  house's guided tour.
+- One button: guided tour, which becomes "Stop tour" while it runs. The gear
+  opens settings, with a switch for each sound, vibration, and spoken cue,
+  fine movement, "Show map" for people watching, and "Replay haptic
+  tutorial". The House picker at the top of settings switches demo houses and
+  starts the new house's guided tour.
 
 The first launch plays the haptic tutorial, then starts the guided tour. You
 walk the tour yourself. It says where the next stop is and how many steps away,
-and plays that room's description when you get there. During the tour three
-more buttons appear: "Previous room" aims you back one stop, "Restart tour"
-puts you back at the front door, and "Jump to room" moves you to any stop and
-plays it. Once the tour has been finished, later launches go straight to free
-exploring; the guided tour button still starts it.
+and plays that room's description when you get there. Stopping and starting
+the tour again puts you back at the front door. Once the tour has been
+finished, later launches go straight to free exploring; the guided tour button
+still starts it.
 
 ## Laptop viewer
 

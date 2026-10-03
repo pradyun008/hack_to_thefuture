@@ -3,7 +3,7 @@ import Foundation
 
 /// Mode 1: a tour the user walks themselves. house.tour is split into
 /// checkpoints, one per narrated stop; the unnarrated points before a stop only
-/// set which way you face when you jump there. The app says where the next
+/// set which way you face when the tour starts there. The app says where the next
 /// stop is, relative to the way you're facing, and plays a stop's narration
 /// only once the avatar actually gets there. You can wander anywhere (walls
 /// still block); the directions come back if you walk for a while without
@@ -13,10 +13,10 @@ final class GuidedTour {
         let floor: Int
         let point: CGPoint
         let say: String
-        let name: String      // room name, for the guidance and the "Jump to room" menu
+        let name: String      // room name, for the guidance
         let room: Int?        // reaching this room counts as arriving
         let stairs: Bool      // the stop before a climb; stepping onto the stairs counts
-        let heading: Double   // facing along the tour path, for jumps
+        let heading: Double   // facing along the tour path, for the start
         let step: Int         // index into house.tour, which pins it to the rail
     }
 
@@ -75,13 +75,8 @@ final class GuidedTour {
         jump(to: 0, intro: [preface, intro].compactMap { $0 }.joined(separator: " "))
     }
 
-    func restart() {
-        jump(to: 0, intro: "Restarting tour.")
-    }
-
-    /// Puts the avatar at a checkpoint and narrates it right away. The
-    /// narration opens with the room's name, so there's no "Jumped to" line.
-    func jump(to index: Int, intro: String? = nil) {
+    /// Puts the avatar at a checkpoint and narrates it right away.
+    private func jump(to index: Int, intro: String? = nil) {
         guard checkpoints.indices.contains(index) else { return }
         begin()
         let cp = checkpoints[index]
@@ -89,16 +84,6 @@ final class GuidedTour {
         lastFloor = cp.floor
         target = index
         arrive(intro: intro)
-    }
-
-    /// Aims back at the stop before the one you last reached, and guides you
-    /// there from where you stand. Pressing again goes back one more.
-    func previous() {
-        guard running else { return }
-        restartRun()
-        target = max((reached ?? target) - 1, 0)
-        reached = nil
-        if isAtTarget() { arrive(intro: "Previous stop.") } else { guide(lead: "Returning to ") }
     }
 
     func stop(silently: Bool = false) {

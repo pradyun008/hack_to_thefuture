@@ -101,12 +101,6 @@ final class SpatialAudio {
         }
     }
 
-    /// Louder beacon for a few seconds, after "find the front door".
-    func boostBeacon() {
-        beacon.volume = 1.0
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in self?.beacon.volume = 0.55 }
-    }
-
     func setWind(_ on: Bool) {
         guard on != windOn else { return }
         windOn = on

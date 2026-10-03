@@ -92,11 +92,8 @@ final class AppModel: ObservableObject {
     }
 
     var floorLabel: String { explorer.floor.name }
-    var otherFloorLabel: String { explorer.floorIndex == 0 ? "Go upstairs" : "Go downstairs" }
-    /// Room names of the tour's stops, in order, for the "Jump to room" menu.
-    var tourStops: [String] { tour.checkpoints.map(\.name) }
 
-    /// Any touch on the map or button takes over from the tutorial. The guided
+    /// Any touch on the map or the settings gear takes over from the tutorial. The guided
     /// tour keeps going, since you walk it yourself.
     func interrupt() {
         if tutorialRunning { stopTutorial() }
@@ -132,30 +129,9 @@ final class AppModel: ObservableObject {
         tour.start(preface: preface)
     }
 
-    func previousStop() { tour.previous() }
-    func restartTour() { tour.restart() }
-    func jumpToStop(_ index: Int) { tour.jump(to: index) }
-
     /// Single tap: during the tour, the way to the next stop; otherwise the room.
     func singleTap() {
         tourRunning ? tour.repeatGuidance() : explorer.announceLocation()
-    }
-
-    func toggleFloor() {
-        interrupt()
-        explorer.changeFloor()
-    }
-
-    /// With the map hidden, a smaller step per swipe is what makes a narrow
-    /// doorway easy to line up with.
-    func announceFineMovement(_ on: Bool) {
-        interrupt()
-        speech.request(on ? "Fine movement. Swipes go a third as far." : "Normal movement.")
-    }
-
-    func findFrontDoor() {
-        interrupt()
-        explorer.findFrontDoor()
     }
 
     /// Double tap on the touch surface: leave the fixed route, or snap back to it.
