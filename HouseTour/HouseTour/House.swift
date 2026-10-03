@@ -50,7 +50,7 @@ struct Room: Decodable {
     var entrySentence: String {
         var parts = [name]
         if let size { parts.append("\(Int(size[0].rounded())) by \(Int(size[1].rounded())) feet") }
-        if !isCloset { parts.append(floor.spoken) }
+        if !isCloset, floor != .unknown { parts.append(floor.spoken) }
         return parts.joined(separator: ". ") + "."
     }
 }
@@ -380,12 +380,12 @@ func relativeSide(from: CGPoint, to target: CGPoint, heading: Double) -> String 
     if angle < -180 { angle += 360 }
     switch angle {
     case -22.5..<22.5: return "ahead"
-    case 22.5..<67.5: return "ahead on your right"
+    case 22.5..<67.5: return "ahead right"
     case 67.5..<112.5: return "on your right"
-    case 112.5..<157.5: return "behind you on your right"
-    case -67.5 ..< -22.5: return "ahead on your left"
+    case 112.5..<157.5: return "back right"
+    case -67.5 ..< -22.5: return "ahead left"
     case -112.5 ..< -67.5: return "on your left"
-    case -157.5 ..< -112.5: return "behind you on your left"
+    case -157.5 ..< -112.5: return "back left"
     default: return "behind you"
     }
 }
@@ -397,10 +397,11 @@ func relativeDirection(from: CGPoint, to target: CGPoint, heading: Double) -> St
     from.distance(to: target) < 1.5 ? "right here" : relativeSide(from: from, to: target, heading: heading)
 }
 
-/// "on your left, about 3 steps", or "right here" when it's within reach.
+/// "on your left, 3 steps", or "right here" when it's within reach. Step
+/// counts are rounded, so "about" would only add a word.
 func place(from: CGPoint, to target: CGPoint, heading: Double) -> String {
     let side = relativeDirection(from: from, to: target, heading: heading)
-    return side == "right here" ? side : "\(side), about \(steps(from.distance(to: target)))"
+    return side == "right here" ? side : "\(side), \(steps(from.distance(to: target)))"
 }
 
 /// Feet to footsteps, using a 2.5 ft stride.

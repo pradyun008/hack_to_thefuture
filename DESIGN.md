@@ -87,11 +87,25 @@ and fixture names are dropped while it plays, since they'd be stale by the end.
 | Entering a room | Name, size, floor | "Kitchen. 14 by 13 feet. Tile." |
 | Standing in a door | Where it goes | "Door to Kitchen." "Opening to Dining area." "Front door." |
 | Single tap | The room | "Living room." |
-| Double tap | Room and floor, nearest doors and where they go, nearest built-in or the stairs, the front door | "Kitchen, first floor. The opening to Dining area is on your right, about 2 steps. The stairs are behind you on your left, about 6 steps. The front door is behind you, about 7 steps." |
-| Two-finger tap | Floor, room, nearest wall, floor type, way to the front door | "First floor, Kitchen. Near the wall on your left. Tile. The front door is behind you on your right, about 7 steps." |
-| Triple tap | Way to the front door | "The front door is behind you, about 5 steps. Follow the chime." |
-| Stairs | Direction and how to use them | "Stairs going up. Hold still to climb." |
-| Guided tour | The next stop and how to get there | "Next stop, Kitchen. Go through the door to Kitchen, ahead on your right, about 3 steps." |
+| Double tap | Room and floor, nearest doors and where they go, nearest built-in in the room or the stairs, the front door | "Kitchen, first floor. Opening to Dining area on your right, 2 steps. Stairs back left, 6 steps. Front door behind you, 7 steps." |
+| Two-finger tap | Floor, room, nearest wall, floor type, way to the front door | "First floor, Kitchen. Wall on your left. Tile. Front door back right, 7 steps." |
+| Triple tap | Way to the front door | "Front door behind you, 5 steps. Follow the chime." |
+| Stairs | Direction and how to use them | "Stairs up. Hold still to climb." |
+| Guided tour | The next stop and how to get there | "Next, Kitchen. Door ahead right, 3 steps." "Next, Laundry room. Through the door to Family room behind you, 3 steps." |
+
+Spoken lines are kept short because every word costs listening time:
+
+- Lead with the thing, then where: "Front door behind you, 7 steps." No "The
+  front door is", "It's", or "There's".
+- Never repeat what was just said. The tour names the next stop, so a door
+  straight into it is only "Door". "Jump to room" plays the room's narration,
+  which opens with its name, so there's no "Jumped to" line.
+- Step counts are rounded already, so no "about".
+- Eight directions: ahead, ahead left, ahead right, on your left, on your
+  right, back left, back right, behind you.
+- Leave out what isn't known. An unlisted floor type isn't spoken.
+- Controls are taught once, in the tutorial. The tour intro and ending only
+  remind.
 
 Outside the guided tour and the double tap, nothing gives directions to
 interior doors. You learn a door is there by reaching it. A room is announced only after the avatar has been in it for
