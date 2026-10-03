@@ -42,7 +42,10 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, minHeight: 50)
             }
             .buttonStyle(.borderedProminent)
-            .padding()
+            .padding([.horizontal, .top])
+
+            AskButton(listening: app.listening, onPress: { app.startListening() }, onRelease: { app.stopListening() })
+                .padding()
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView(calibrateForward: app.calibrateForward) {

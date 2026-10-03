@@ -21,17 +21,6 @@ enum CellKind: UInt8 {
 
 enum FloorType: String, Decodable, CaseIterable {
     case hardwood, carpet, tile, concrete, deck, unknown
-
-    var spoken: String {
-        switch self {
-        case .hardwood: "Hardwood"
-        case .carpet: "Carpet"
-        case .tile: "Tile"
-        case .concrete: "Concrete"
-        case .deck: "Deck boards"
-        case .unknown: "Floor type not listed"
-        }
-    }
 }
 
 struct Room: Decodable {
@@ -46,13 +35,8 @@ struct Room: Decodable {
     var isStairs: Bool { kind == "stairs" }
     var isCloset: Bool { kind == "closet" }
 
-    /// "Kitchen. 14 by 13 feet. Tile."
-    var entrySentence: String {
-        var parts = [name]
-        if let size { parts.append("\(Int(size[0].rounded())) by \(Int(size[1].rounded())) feet") }
-        if !isCloset, floor != .unknown { parts.append(floor.spoken) }
-        return parts.joined(separator: ". ") + "."
-    }
+    /// "Kitchen." Size and floor type aren't spoken; the floor is felt underfoot.
+    var entrySentence: String { name + "." }
 }
 
 struct Door: Decodable {

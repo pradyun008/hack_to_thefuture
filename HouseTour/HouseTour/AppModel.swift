@@ -25,6 +25,10 @@ final class AppModel: ObservableObject {
 
     @Published private(set) var tourRunning = false
     @Published private(set) var tutorialRunning = false
+    /// The hold-to-talk button is down and the mic is open.
+    @Published private(set) var listening = false
+    private let listener = Listener()
+    private var listenStart = Date.distantPast
     private var tutorialTask: Task<Void, Never>?
     private var tutorialRun = 0   // bumps on each start so a replaced tutorial's follow-up doesn't run
     private var bag = Set<AnyCancellable>()
@@ -165,6 +169,73 @@ final class AppModel: ObservableObject {
     func toggleRail() {
         interrupt()
         explorer.toggleRail()
+    }
+
+    // MARK: Asking aloud
+
+    /// Hold-to-talk pressed: stop talking, hold anything new, and open the mic.
+    /// The first press only asks for permission, since the prompts take over
+    /// the screen anyway.
+    func startListening() {
+        interrupt()
+        guard !listening else { return }
+        switch Listener.permission {
+        case .granted:
+            break
+        case .undetermined:
+            Listener.requestPermission { [weak self] ok in
+                self?.speech.say(ok ? "Ready. Hold the button and ask." : Self.permissionHelp, interrupt: true)
+            }
+            return
+        case .denied:
+            speech.say(Self.permissionHelp, interrupt: true)
+            return
+        }
+        speech.hold()
+        guard listener.start(hints: Question.hints(for: house)) else {
+            speech.resume { speech.say("The microphone isn't available right now.", interrupt: true) }
+            return
+        }
+        listening = true
+        listenStart = Date()
+        haptics.listening(true)
+        audio.cue(listening: true)
+    }
+
+    /// Hold-to-talk released: close the mic and answer what was heard. A press
+    /// too short to hold a question is taken as not knowing to hold.
+    func stopListening() {
+        guard listening else { return }
+        listening = false
+        haptics.listening(false)
+        guard Date().timeIntervalSince(listenStart) >= 0.3 else {
+            listener.cancel()
+            audio.cue(listening: false)
+            speech.resume { speech.say("Hold the button while you ask.", interrupt: true) }
+            return
+        }
+        listener.finish { [weak self] heard in
+            guard let self else { return }
+            self.speech.resume { self.answer(heard) }
+        }
+        // After `finish`, which hands the audio session back to playback.
+        audio.cue(listening: false)
+    }
+
+    private static let permissionHelp =
+        "To ask questions, turn on Microphone and Speech Recognition for House Tour in the Settings app."
+
+    private func answer(_ heard: String) {
+        let match = Question.match(heard, in: house, from: explorer.floorIndex, at: explorer.position)
+        switch match {
+        case .whereAmI: explorer.whereAmI()
+        case .waysOut: explorer.waysOut()
+        case .frontDoor: explorer.wayToFrontDoor()
+        case let .room(floor, index): explorer.wayTo(room: index, onFloor: floor)
+        case nil:
+            let lead = heard.isEmpty ? "I didn't catch that." : "I heard \(heard)."
+            speech.say(lead + " " + Question.examples, interrupt: true)
+        }
     }
 
     /// `then` runs when the tutorial ends, whether it finished or was stopped,

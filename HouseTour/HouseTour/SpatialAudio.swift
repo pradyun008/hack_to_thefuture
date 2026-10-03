@@ -21,6 +21,8 @@ final class SpatialAudio {
     private lazy var beaconLoop = Synth.beaconLoop(format)
     private lazy var chimeBuffer = Synth.chime(format, gain: 0.8)
     private lazy var windLoop = Synth.wind(format)
+    private lazy var micOn = Synth.cue(format, rising: true)
+    private lazy var micOff = Synth.cue(format, rising: false)
 
     private var beaconOn = false
     private var windOn = false
@@ -133,6 +135,13 @@ final class SpatialAudio {
         effects.scheduleBuffer(chimeBuffer, at: nil, options: .interrupts)
         effects.play()
     }
+
+    /// Two quick notes, rising as the mic opens and falling as it closes.
+    func cue(listening on: Bool) {
+        guard start() else { return }
+        effects.scheduleBuffer(on ? micOn : micOff, at: nil, options: .interrupts)
+        effects.play()
+    }
 }
 
 /// Every sound is synthesized, so there are no audio assets to manage.
@@ -171,6 +180,16 @@ enum Synth {
             }
             return Float(note(0, 1318.5) + note(0.16, 1046.5))
         }, peak: 0.7)
+    }
+
+    /// Two short notes a fifth apart, 0.2 s in all.
+    static func cue(_ f: AVAudioFormat, rising: Bool) -> AVAudioPCMBuffer {
+        let (first, second) = rising ? (660.0, 990.0) : (990.0, 660.0)
+        return normalize(buffer(f, seconds: 0.2) { _, t in
+            let hz = t < 0.09 ? first : second
+            let u = t < 0.09 ? t : t - 0.09
+            return Float(min(u / 0.005, 1) * exp(-u / 0.05) * sin(2 * .pi * hz * u))
+        }, peak: 0.5)
     }
 
     /// Low rumbling noise with a slow swell, looped while outside the house.
