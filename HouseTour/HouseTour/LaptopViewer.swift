@@ -18,12 +18,26 @@ final class LaptopViewer {
         var onRail = true  // the avatar is locked to the route
         var said = ""
         var saidAt = 0.0   // seconds since 1970, so the page can fade old lines
+        var events: [Event] = []   // the latest haptics and sounds, for the visualizer panel
+        var left = 0.0     // measured output level per ear, RMS 0 to 1
+        var right = 0.0
+        var speaking = false
+    }
+
+    /// One vibration or sound. The page skips ids it has already drawn.
+    struct Event: Encodable {
+        let id: Int
+        let kind: String   // "haptic" or "sound"
+        let name: String
+        let level: Double  // 0 to 1
+        var pan = 0.0      // -1 left ear only, 0 both, 1 right ear only
     }
 
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "laptop-viewer")
     private let lock = NSLock()
     private var snapshot = Snapshot()
+    private var nextEvent = 0
     private var houseJSON = Data()   // guarded by `lock`, like `snapshot`
     /// Served at /transcript. Set before `start`.
     var transcript: Transcript?
@@ -64,6 +78,16 @@ final class LaptopViewer {
         lock.lock()
         change(&snapshot)
         lock.unlock()
+    }
+
+    /// A haptic or sound the phone just played. The page polls every 100 ms, so
+    /// the last few are kept rather than only the newest.
+    func record(_ kind: String, _ name: String, level: Float, pan: Float = 0) {
+        update {
+            nextEvent += 1
+            $0.events.append(Event(id: nextEvent, kind: kind, name: name, level: Double(level), pan: Double(pan)))
+            if $0.events.count > 24 { $0.events.removeFirst($0.events.count - 24) }
+        }
     }
 
     // MARK: HTTP
@@ -146,7 +170,7 @@ private let viewerPage = #"""
 body{background:#fff;color:#111;font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
   -webkit-font-smoothing:antialiased;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
   grid-template-columns:minmax(0,1fr) 380px}
-header,.stage,footer{grid-column:1}
+header,.split,footer{grid-column:1}
 #log{grid-column:2;grid-row:1/-1;border-left:1px solid #eee;display:flex;flex-direction:column;min-height:0}
 #log h2{display:flex;justify-content:space-between;align-items:baseline;margin:0;padding:22px 20px 12px;
   font-size:12px;font-weight:500;color:#8a8a8a}
@@ -159,7 +183,14 @@ header{display:flex;justify-content:space-between;gap:16px;padding:22px 36px;fon
 #status{display:flex;gap:8px;align-items:center;color:#2563eb}
 #status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
 #status.off{color:#8a8a8a}
-.stage{margin:0 36px;background:#fafafa;border-radius:12px;min-height:0}
+.split{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:20px;margin:0 36px;min-height:0}
+.stage{background:#fafafa;border-radius:12px;min-height:0}
+.viz{display:grid;grid-template-rows:1fr 1fr;gap:20px;min-height:0}
+.card{position:relative;border-radius:12px;overflow:hidden;min-height:0}
+.card h2{position:absolute;top:14px;left:18px;margin:0;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.8)}
+.card .now{position:absolute;left:18px;right:18px;bottom:14px;font-size:16px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sound{background:linear-gradient(90deg,#f07f7f,#d63636)}
+#haptic{background:#0f172a}
 canvas{display:block;width:100%;height:100%}
 footer{padding:20px 36px 36px;max-width:900px;width:100%;margin:0 auto;text-align:center}
 #where{font-size:12px;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase}
@@ -168,13 +199,20 @@ footer{padding:20px 36px 36px;max-width:900px;width:100%;margin:0 auto;text-alig
 #ticks i{width:22px;height:3px;border-radius:2px;background:#e6e6e6}
 #ticks i.done{background:#a9c2f5}#ticks i.now{background:#2563eb}
 #said{font-size:22px;line-height:1.45;color:#222;min-height:64px;margin:0;transition:opacity .8s}
-@media(max-width:900px){body{grid-template-columns:1fr;grid-template-rows:auto 60vh auto auto}
+@media(max-width:900px){body{grid-template-columns:1fr;grid-template-rows:auto auto auto auto}
   #log{grid-column:1;grid-row:auto;border-left:0;border-top:1px solid #eee}#lines{max-height:50vh}}
-@media(max-width:700px){header,footer{padding-left:18px;padding-right:18px}.stage{margin:0 18px}#said{font-size:18px}}
+@media(max-width:800px){.split{grid-template-columns:1fr;grid-template-rows:minmax(320px,60vh) auto}.viz{grid-template-rows:200px 200px}}
+@media(max-width:700px){header,footer{padding-left:18px;padding-right:18px}.split{margin:0 18px}#said{font-size:18px}}
 @media(prefers-reduced-motion:reduce){#said{transition:none}}
 </style></head><body>
 <header><span id="address">Waiting for your iPhone…</span><span id="status" class="off">Connecting</span></header>
+<main class="split">
 <div class="stage"><canvas id="map" role="img" aria-label="Live floor plan with your position. The room and floor are written below it."></canvas></div>
+<section class="viz" aria-label="What the phone is playing">
+<div class="card" id="sound"><h2>Sound · AirPods</h2><canvas id="soundviz" aria-hidden="true"></canvas><div class="now" id="soundnow">Quiet</div></div>
+<div class="card" id="haptic"><h2>Haptics · iPhone</h2><canvas id="hapticviz" aria-hidden="true"></canvas><div class="now" id="hapticnow">Still</div></div>
+</section>
+</main>
 <footer><div id="where" aria-live="polite">Open House Tour on your iPhone</div><div id="ticks" aria-hidden="true"></div><p id="said" aria-live="polite"></p></footer>
 <aside id="log"><h2>Transcript <a href="/transcript.txt" download>Download</a></h2><ol id="lines"></ol></aside>
 <script>
@@ -289,6 +327,7 @@ async function poll() {
     if (trail.length > 600) trail.shift();
     present(s);
     draw(s);
+    ingest(s);
   } catch (e) {
     setText($("status"), "Disconnected. Is the app open?");
     $("status").className = "off";
@@ -328,6 +367,99 @@ async function pollTranscript() {
   setTimeout(pollTranscript, 500);
 }
 
+// The visualizer panel. Phone and laptop clocks differ, so everything animates
+// from the moment this page first sees it, not from the phone's timestamps.
+const soundCv = $("soundviz"), soundCtx = soundCv.getContext("2d");
+const hapticCv = $("hapticviz"), hapticCtx = hapticCv.getContext("2d");
+const BARS = 72, sounds = [], rings = [];
+const ears = [{ name: "L", bars: new Array(BARS).fill(0.03), level: 0 },
+              { name: "R", bars: new Array(BARS).fill(0.03), level: 0 }];
+let lastEvent = 0, primed = false, lastSaid = 0, speechUntil = 0, glow = 0;
+let speaking = false, sawSpeaking = false, measured = [0, 0];
+
+function ingest(s) {
+  const now = performance.now();
+  // Real per-ear output, measured on the phone. Square root because loudness
+  // is heard roughly that way, so quiet sounds still show.
+  measured = [Math.min(1, Math.sqrt(s.left || 0) * 2.2), Math.min(1, Math.sqrt(s.right || 0) * 2.2)];
+  if (s.speaking) sawSpeaking = true;
+  speaking = !!s.speaking;
+  if (s.saidAt !== lastSaid) {
+    // Speech has no end signal here, so its length is estimated from the words.
+    if (primed && s.said) { speechUntil = now + Math.min(12000, 700 + s.said.length * 62); setText($("soundnow"), "Voice"); }
+    lastSaid = s.saidAt;
+  }
+  for (const e of s.events || []) {
+    if (e.id <= lastEvent) continue;
+    lastEvent = e.id;
+    if (!primed) continue;   // don't replay whatever happened before the page opened
+    if (e.kind === "haptic") { rings.push({ born: now, level: e.level }); glow = Math.max(glow, e.level); setText($("hapticnow"), e.name); }
+    else { sounds.push({ born: now, level: e.level, pan: e.pan || 0 }); setText($("soundnow"), e.name); }
+  }
+  primed = true;
+}
+
+function fit(cv) {
+  const b = cv.getBoundingClientRect(), u = devicePixelRatio || 1;
+  const w = Math.round(b.width * u), h = Math.round(b.height * u);
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return u;
+}
+
+function frame(t) {
+  // Sound: one row of white bars per ear, L above R. Each row follows that
+  // ear's measured level, so the 3D front door beacon leans to one side as you
+  // turn. Speech and the one-shot effects are mono, the same in both ears.
+  const talking = sawSpeaking ? speaking : t < speechUntil;
+  const voice = talking ? 0.5 + 0.4 * Math.abs(Math.sin(t / 110)) : 0, side = [voice, voice];
+  if (!talking && $("soundnow").textContent === "Voice") setText($("soundnow"), "Quiet");
+  // A one-shot lights the ear it played in: a turn tick is panned to one side.
+  for (let i = sounds.length - 1; i >= 0; i--) {
+    const age = (t - sounds[i].born) / 1000;
+    if (age > 1) { sounds.splice(i, 1); continue; }
+    const e = sounds[i].level * Math.exp(-age * 3.5), pan = sounds[i].pan;
+    side[0] = Math.max(side[0], e * (pan > 0 ? 1 - pan : 1));
+    side[1] = Math.max(side[1], e * (pan < 0 ? 1 + pan : 1));
+  }
+  const u = fit(soundCv), W = soundCv.width, H = soundCv.height;
+  const top = 40 * u, rowH = (H - top - 44 * u) / 2;
+  soundCtx.clearRect(0, 0, W, H);
+  ears.forEach((ear, e) => {
+    ear.level += (measured[e] - ear.level) * 0.25;
+    const energy = Math.max(side[e], ear.level), mid = top + rowH * (e + 0.5);
+    soundCtx.fillStyle = "rgba(255,255,255,.75)"; soundCtx.font = `600 ${11 * u}px -apple-system, system-ui, sans-serif`;
+    soundCtx.textBaseline = "middle"; soundCtx.fillText(ear.name, 18 * u, mid);
+    soundCtx.fillStyle = "#fff";
+    const x0 = 40 * u, span = W - x0 - 18 * u, g = span / BARS, w = Math.max(1.5 * u, g * 0.3);
+    for (let i = 0; i < BARS; i++) {
+      const taper = Math.sin(Math.PI * (0.06 + 0.88 * i / (BARS - 1)));
+      const target = 0.025 + energy * taper * (0.3 + 0.7 * Math.random());
+      ear.bars[i] += (target - ear.bars[i]) * (target > ear.bars[i] ? 0.55 : 0.15);
+      const h = Math.max(2 * u, ear.bars[i] * rowH * 0.9);
+      soundCtx.fillRect(x0 + i * g + (g - w) / 2, mid - h / 2, w, h);
+    }
+  });
+
+  // Haptics: a circle that sends out a ring for every vibration, wider and
+  // brighter the stronger it was.
+  const v = fit(hapticCv), HW = hapticCv.width, HH = hapticCv.height;
+  const cx = HW / 2, cy = HH / 2, r0 = Math.min(HW, HH) * 0.1, rMax = Math.min(HW, HH) * 0.45;
+  hapticCtx.clearRect(0, 0, HW, HH);
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const age = (t - rings[i].born) / 1100;
+    if (age >= 1) { rings.splice(i, 1); continue; }
+    const level = rings[i].level, r = r0 + (rMax - r0) * (1 - (1 - age) * (1 - age));
+    hapticCtx.strokeStyle = `rgba(125,170,255,${(1 - age) * (0.3 + 0.7 * level)})`;
+    hapticCtx.lineWidth = (1.5 + 6 * level) * v * (1 - 0.6 * age);
+    hapticCtx.beginPath(); hapticCtx.arc(cx, cy, r, 0, Math.PI * 2); hapticCtx.stroke();
+  }
+  glow *= 0.9;
+  hapticCtx.fillStyle = `rgba(125,170,255,${0.3 + 0.7 * glow})`;
+  hapticCtx.beginPath(); hapticCtx.arc(cx, cy, r0 * (1 + 0.3 * glow), 0, Math.PI * 2); hapticCtx.fill();
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
 poll();
 pollTranscript();
 </script></body></html>

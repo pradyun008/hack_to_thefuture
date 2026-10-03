@@ -115,6 +115,10 @@ final class AppModel: ObservableObject {
         $tourRunning.sink { on in viewer.update { $0.touring = on } }.store(in: &bag)
         viewer.transcript = transcript
         speech.onSkip = { [weak self] text in self?.log(text, who: "skipped") }
+        haptics.onPlay = { name, level in viewer.record("haptic", name, level: level) }
+        audio.onSound = { name, level, pan in viewer.record("sound", name, level: level, pan: pan) }
+        audio.onLevels = { left, right in viewer.update { $0.left = Double(left); $0.right = Double(right) } }
+        speech.onSpeaking = { on in viewer.update { $0.speaking = on } }
         speech.onSay = { [weak self] text in
             self?.log(text, who: "app")
             viewer.update {

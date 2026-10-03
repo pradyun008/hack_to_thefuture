@@ -5,6 +5,12 @@ import AVFoundation
 /// pans and fades as the avatar moves and turns, matching the spoken directions. Works on any stereo headphones. Bluetooth adds ~200 ms of lag,
 /// wall contacts also retain their immediate haptic feedback.
 final class SpatialAudio {
+    /// Every one-shot sound, by name, loudness, and pan (-1 left ear only, 0
+    /// both, 1 right only), for the laptop viewer's sound panel.
+    var onSound: ((String, Float, Float) -> Void)?
+    /// The real left and right output levels (RMS, 0 to 1), measured off the
+    /// mixer about 40 times a second, so the viewer shows what each ear gets.
+    var onLevels: ((Float, Float) -> Void)?
     private let engine = AVAudioEngine()
     private let environment = AVAudioEnvironmentNode()
     private let beacon = AVAudioPlayerNode()
@@ -50,6 +56,7 @@ final class SpatialAudio {
         environment.distanceAttenuationParameters.maximumDistance = 120
         environment.distanceAttenuationParameters.rolloffFactor = 0.9
         environment.listenerAngularOrientation = AVAudio3DAngularOrientation(yaw: 0, pitch: 0, roll: 0)
+        installLevelTap()
         beacon.position = AVAudio3DPoint(x: Float(frontDoor.x), y: 0, z: Float(frontDoor.y))
         beacon.volume = 0.55
         wind.volume = 0.22
@@ -81,6 +88,7 @@ final class SpatialAudio {
 
     /// Headphones plugged in or AirPods connected: the engine stops and drops its schedule.
     private func recover() {
+        installLevelTap()
         start()
         if beaconOn { beaconOn = false; setBeacon(true) }
         if windOn { windOn = false; setWind(true) }
@@ -126,8 +134,28 @@ final class SpatialAudio {
         }
     }
 
+    /// Measures the mixed output per channel. Listening only: the tap copies the
+    /// signal and changes nothing anyone hears.
+    private func installLevelTap() {
+        let mixer = engine.mainMixerNode
+        mixer.removeTap(onBus: 0)
+        mixer.installTap(onBus: 0, bufferSize: 1024, format: mixer.outputFormat(forBus: 0)) { [weak self] buffer, _ in
+            guard let data = buffer.floatChannelData else { return }
+            let n = Int(buffer.frameLength), channels = Int(buffer.format.channelCount)
+            guard n > 0 else { return }
+            func rms(_ c: Int) -> Float {
+                var sum: Float = 0
+                for i in 0..<n { sum += data[c][i] * data[c][i] }
+                return (sum / Float(n)).squareRoot()
+            }
+            let left = rms(0), right = channels > 1 ? rms(1) : left
+            DispatchQueue.main.async { self?.onLevels?(left, right) }
+        }
+    }
+
     /// Short high-pitched warning, independent of narration and other effects.
     func wallWarning() {
+        onSound?("Wall warning beep", 1, 0)
         guard start() else { return }
         warning.scheduleBuffer(warningBuffer, at: nil, options: .interrupts)
         warning.play()
@@ -136,6 +164,7 @@ final class SpatialAudio {
     /// A soft tick in one ear only: the side to turn toward. Panned, not
     /// spatial, so it can't be heard as coming from somewhere in the house.
     func turnTick(right: Bool) {
+        onSound?(right ? "Turn tick · right" : "Turn tick · left", 0.6, right ? 1 : -1)
         guard start() else { return }
         turn.pan = right ? 1 : -1
         turn.scheduleBuffer(turnTickBuffer, at: nil, options: .interrupts)
@@ -144,6 +173,7 @@ final class SpatialAudio {
 
     /// Front door chime, played in the head (not spatial).
     func chime() {
+        onSound?("Front door chime", 0.8, 0)
         guard start() else { return }
         effects.scheduleBuffer(chimeBuffer, at: nil, options: .interrupts)
         effects.play()
@@ -151,6 +181,7 @@ final class SpatialAudio {
 
     /// Two quick notes, rising as the mic opens and falling as it closes.
     func cue(listening on: Bool) {
+        onSound?(on ? "Mic on" : "Mic off", 0.5, 0)
         guard start() else { return }
         effects.scheduleBuffer(on ? micOn : micOff, at: nil, options: .interrupts)
         effects.play()
