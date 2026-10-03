@@ -46,6 +46,7 @@ final class Explorer: ObservableObject {
     private var trail: [CGPoint] = []  // recent path, newest last, for the heading
     private var travelHeading: Double?  // way this drag walked, applied on lift
     private var atDoors = Set<Int>()  // doors already announced on this arrival
+    private var lastCrossed: [String: Date] = [:]  // when each room was entered or door reached
     private var contact: [CellKind?] = [nil, nil]   // what each axis (x, y) last bumped
     private var lastHit = [Date.distantPast, Date.distantPast]
     private var lastKnock = Date.distantPast
@@ -60,6 +61,7 @@ final class Explorer: ObservableObject {
     static let warningZone = 1.5     // ft from a wall where the hum starts
     static let doorReach = 1.0       // ft from a door's opening that counts as "at the door"
     static let doorRearm = 2.0       // ft away before the same door is announced again
+    static let repeatQuiet = 8.0     // s before a room or door you keep crossing is named again
     static let headingWindow = 1.5   // ft of travel the heading is taken over
     static let knockRepeat = 0.3     // s between knocks while pushing into a wall
 
@@ -247,8 +249,7 @@ final class Explorer: ObservableObject {
     /// Triple tap: where you are, in three facts. Which room, how close you are
     /// to a wall, and the nearest door. Nothing else: this gets asked in the
     /// middle of walking, and a tap can't cut speech off, so every extra clause
-    /// is time the user is stuck waiting. The floor type is still given on the
-    /// way into a room, where it isn't competing with anything.
+    /// is time the user is stuck waiting.
     /// "First floor, Kitchen. Wall on your left. Opening to Dining area on your right, 2 steps."
     func whereAmI() {
         let p = position
@@ -523,6 +524,7 @@ final class Explorer: ObservableObject {
     private func commit(_ room: Int?) {
         guard room != currentRoom else { return }
         setRoom(room)
+        guard !crossedRecently("room \(room ?? -1)") else { return }
         // Queue behind a door name said a moment ago instead of cutting it off.
         let doorJustSpoken = Date().timeIntervalSince(lastDoorSpeech) < 1.5
         // Not over tour narration: queued behind it, the name would be stale.
@@ -532,6 +534,17 @@ final class Explorer: ObservableObject {
     }
 
     private var lastDoorSpeech = Date.distantPast
+
+    /// Pacing back and forth through a doorway would name the same rooms and
+    /// door on every pass. Each pass restarts the clock, so the names stay quiet
+    /// until you've been away from that spot for `repeatQuiet` seconds. The
+    /// haptics still play every time.
+    private func crossedRecently(_ what: String) -> Bool {
+        let key = "\(floorIndex) \(what)"
+        let now = Date()
+        defer { lastCrossed[key] = now }
+        return lastCrossed[key].map { now.timeIntervalSince($0) < Self.repeatQuiet } ?? false
+    }
 
     private func setRoom(_ room: Int?) {
         currentRoom = room
@@ -574,7 +587,7 @@ final class Explorer: ObservableObject {
         } else {
             haptics.doorway()
         }
-        if Setting.speakDoors.isOn, !speech.isNarrating {
+        if !crossedRecently("door \(arrived.index)"), Setting.speakDoors.isOn, !speech.isNarrating {
             speech.say(doorName(door, from: lastLabel ?? currentRoom))
             lastDoorSpeech = Date()
         }
