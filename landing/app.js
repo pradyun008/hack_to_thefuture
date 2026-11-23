@@ -12,6 +12,16 @@
   const ACCENT = color("--accent") || "#2747f5";
   const PAPER = color("--paper") || "#f9fbfd";
 
+  /* ---------- Arrival: start once fonts are in, or after 0.7 s ---------- */
+  let readyAt = null;
+  const markReady = () => {
+    if (readyAt !== null) return;
+    readyAt = performance.now();
+    document.documentElement.classList.add("ready");
+  };
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(markReady);
+  setTimeout(markReady, 700);
+
   /* ---------- Braille (uncontracted letters, dots 1-6) ---------- */
   const BRAILLE = {
     a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5], f: [1, 2, 4], g: [1, 2, 4, 5],
@@ -380,38 +390,43 @@
     const cellPx = PLAN.cell * scale;
     const dotR = Math.max(1.05, cellPx * 0.36);
 
-    g.save();
-    if (rotated) { g.translate(H_FT * scale, 0); g.rotate(Math.PI / 2); }
-    // Raised dots: a soft offset shadow under each, like swell paper.
-    g.save();
-    g.shadowColor = "rgba(18, 35, 61, 0.35)";
-    g.shadowBlur = Math.max(1, cellPx * 0.35) * dpr;
-    g.shadowOffsetX = cellPx * 0.12 * dpr;
-    g.shadowOffsetY = cellPx * 0.22 * dpr;
+    // Raised dots: each kind is drawn once with its soft offset shadow, like
+    // swell paper, then stamped. Per-dot canvas shadows are slow on phones.
+    const blur = Math.max(1, cellPx * 0.35), offX = cellPx * 0.12, offY = cellPx * 0.22;
+    function sprite(paint, radius) {
+      const half = radius + blur * 2 + Math.max(offX, offY);
+      const size = Math.ceil(half * 2 * dpr);
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      const sg = c.getContext("2d");
+      sg.scale(dpr, dpr);
+      sg.shadowColor = "rgba(18, 35, 61, 0.35)";
+      sg.shadowBlur = blur * dpr;
+      sg.shadowOffsetX = offX * dpr;
+      sg.shadowOffsetY = offY * dpr;
+      sg.beginPath();
+      paint(sg, half, half);
+      return { c, half: size / dpr / 2 };
+    }
+    const SPRITES = {
+      "#": sprite((sg, x, y) => { sg.fillStyle = INK; sg.arc(x, y, dotR, 0, Math.PI * 2); sg.fill(); }, dotR),
+      w: sprite((sg, x, y) => { sg.strokeStyle = INK; sg.lineWidth = Math.max(0.9, dotR * 0.45); sg.arc(x, y, dotR * 0.85, 0, Math.PI * 2); sg.stroke(); }, dotR),
+      s: sprite((sg, x, y) => { sg.fillStyle = INK; sg.arc(x, y, dotR * 0.5, 0, Math.PI * 2); sg.fill(); }, dotR * 0.5),
+    };
     for (let r = 0; r < PLAN.rows; r++) {
       const line = PLAN.grid[r];
       for (let c = 0; c < PLAN.cols; c++) {
         const ch = line[c];
-        if (ch === ".") continue;
-        const cx = (c + 0.5) * cellPx, cy = (r + 0.5) * cellPx;
-        g.beginPath();
-        if (ch === "#") {
-          g.fillStyle = INK;
-          g.arc(cx, cy, dotR, 0, Math.PI * 2);
-          g.fill();
-        } else if (ch === "w") {
-          g.strokeStyle = INK;
-          g.lineWidth = Math.max(0.9, dotR * 0.45);
-          g.arc(cx, cy, dotR * 0.85, 0, Math.PI * 2);
-          g.stroke();
-        } else if (ch === "s" && (r + c) % 2 === 0) {
-          g.fillStyle = INK;
-          g.arc(cx, cy, dotR * 0.5, 0, Math.PI * 2);
-          g.fill();
-        }
+        if (ch === "." || (ch === "s" && (r + c) % 2)) continue;
+        const sp = SPRITES[ch];
+        if (!sp) continue;
+        const [sx, sy] = toScreen((c + 0.5) * PLAN.cell, (r + 0.5) * PLAN.cell);
+        g.drawImage(sp.c, sx - sp.half, sy - sp.half, sp.half * 2, sp.half * 2);
       }
     }
-    g.restore();
+
+    g.save();
+    if (rotated) { g.translate(H_FT * scale, 0); g.rotate(Math.PI / 2); }
 
     // Entrance mark: the tactile-map convention of a solid triangle.
     const fd = PLAN.front;
@@ -475,13 +490,20 @@
     }
   }
 
+  let lastSizeKey = "";
+  let planInView = false;
+  let fontsReady = false;
   function resize() {
     rotated = narrow.matches;
     const across = rotated ? H_FT : W_FT, down = rotated ? W_FT : H_FT;
     canvas.style.aspectRatio = `${across} / ${down}`;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width) return;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const nextDpr = Math.min(window.devicePixelRatio || 1, 2);
+    const key = `${rect.width}|${rotated}|${nextDpr}|${fontsReady}`;
+    if (key === lastSizeKey) return;
+    lastSizeKey = key;
+    dpr = nextDpr;
     scale = rect.width / across;
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.width * (down / across) * dpr);
@@ -782,6 +804,8 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    // Print the plan once the card has risen in and most of it is on screen.
+    if (printStart === null && planInView && readyAt !== null && now - readyAt > 450) printStart = now;
     const printed = printStart !== null && now - printStart >= PRINT_MS;
 
     if (demo && printed && now >= demo.pauseUntil) {
@@ -824,16 +848,15 @@
   if ("IntersectionObserver" in window) {
     new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
-      // Print the plan the first time most of it is on screen.
-      if (printStart === null && entry.intersectionRatio >= 0.45) printStart = performance.now();
+      planInView = entry.intersectionRatio >= 0.45;
     }, { threshold: [0, 0.45] }).observe(canvas);
-  } else if (printStart === null) {
-    printStart = performance.now();
+  } else {
+    planInView = true;
   }
   if ("ResizeObserver" in window) new ResizeObserver(resize).observe(canvas);
   else window.addEventListener("resize", resize);
   narrow.addEventListener && narrow.addEventListener("change", resize);
-  (document.fonts ? document.fonts.ready : Promise.resolve()).then(resize);
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { fontsReady = true; resize(); });
   resize();
   requestAnimationFrame(frame);
   }
