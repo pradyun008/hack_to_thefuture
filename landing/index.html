@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Haptix: floor plans you can feel</title>
+  <meta name="description" content="Haptix turns a listing's floor plan into vibration and 3D sound on an iPhone, so blind and low-vision buyers can explore a home on their own. Book a 15-minute demo.">
+  <meta name="theme-color" content="#EDF1F5">
+  <meta name="robots" content="noindex">
+  <link rel="preload" href="fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/funnel-display-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="wordmark" href="#top" aria-label="Haptix, home">
+        <span class="wordmark-print">Haptix</span>
+        <span class="braille" data-braille="haptix" aria-hidden="true"></span>
+      </a>
+      <nav aria-label="Main">
+        <ul class="nav-list">
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#agents">For agents</a></li>
+          <li><a href="#orgs">For organizations</a></li>
+          <li><a href="#team">Team</a></li>
+        </ul>
+      </nav>
+      <a class="button button-small" href="#demo">Book a demo</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1 id="hero-title">Floor plans your blind clients can walk through.</h1>
+          <p class="lede">Haptix turns a listing's floor plan into vibration and 3D sound on an iPhone. Your client explores every room on their own, at their own pace.</p>
+          <div class="actions">
+            <a class="button" href="#demo">Book a 15-minute demo</a>
+            <a class="text-link" href="#how">See how it works</a>
+          </div>
+        </div>
+
+        <figure class="explorer" aria-labelledby="explorer-title">
+          <div class="explorer-bar">
+            <p class="explorer-title" id="explorer-title">Try it: walk the first floor of a real listing</p>
+            <button class="toggle" type="button" id="sound-toggle" aria-pressed="false">
+              <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18"><path d="M3 8h3l4-3.5v11L6 12H3z" fill="currentColor"/><path class="wave" d="M13 7.2c1 .8 1.5 1.7 1.5 2.8s-.5 2-1.5 2.8M15.2 5c1.7 1.4 2.6 3.1 2.6 5s-.9 3.6-2.6 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <span>Sound off</span>
+            </button>
+          </div>
+          <div class="plan-frame">
+            <canvas id="plan" tabindex="0" role="application" aria-roledescription="floor plan explorer" aria-label="First floor of the demo house" aria-describedby="plan-help"></canvas>
+            <noscript><p class="noscript">The interactive floor plan needs JavaScript. The rest of the page works without it.</p></noscript>
+          </div>
+          <div class="ears" aria-hidden="true">
+            <p class="ears-title">What they hear <span class="ears-source" id="ears-source"></span></p>
+            <div class="ears-grid">
+              <span class="ear-label">Left ear</span>
+              <span class="ear-label">Right ear</span>
+              <canvas id="ears"></canvas>
+            </div>
+          </div>
+          <figcaption>
+            <p class="demo-note" id="demo-note" hidden>Playing a short demo. Turn on sound to hear it, or touch the dot to take over.</p>
+            <p class="ask" id="ask" hidden><svg aria-hidden="true" viewBox="0 0 20 20" width="16" height="16"><rect x="7" y="2" width="6" height="10" rx="3" fill="currentColor"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> They ask: <span></span></p>
+            <p class="readout" id="readout" aria-live="polite">Foyer. Hardwood.</p>
+            <p class="help" id="plan-help">Drag the blue dot, or select the map and use the arrow keys. Walls stop you, the way they stop the walker in the app.</p>
+            <ul class="chips" aria-label="Last thing felt">
+              <li data-chip="wall">Wall</li>
+              <li data-chip="window">Window</li>
+              <li data-chip="doorway">Doorway</li>
+              <li data-chip="opening">Open plan</li>
+              <li data-chip="front">Front door</li>
+            </ul>
+            <button class="text-button" type="button" id="reset">Back to the front door</button>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section how" id="how" aria-labelledby="how-title">
+      <div class="wrap">
+        <h2 id="how-title">How it works</h2>
+        <ol class="steps">
+          <li>
+            <h3>Drag to walk</h3>
+            <p>The phone screen works like a trackpad, and the map stays hidden. A finger moves the walker through the house, starting just inside the front door. A set path runs through every room, so it's hard to get lost.</p>
+          </li>
+          <li>
+            <h3>Feel what you touch</h3>
+            <p>Walls, windows, doorways, and stairs each have their own vibration. Carpet, tile, and hardwood feel different underfoot. With AirPods Pro, turning your head turns the walker.</p>
+          </li>
+          <li>
+            <h3>Ask out loud</h3>
+            <p>Hold the bottom of the screen and ask: "Where am I?" "How many steps to the kitchen?" "Take me to the front door." A guided tour can also narrate each room.</p>
+          </li>
+        </ol>
+
+        <div class="vocab">
+          <div class="vocab-head">
+            <h3 id="vocab-title">Every surface has its own feel</h3>
+            <p>These are the patterns the app plays. Press play to see the rhythm. Android phones vibrate it too.</p>
+          </div>
+          <ul class="vocab-list" aria-labelledby="vocab-title">
+            <li data-pattern="wall"><span class="vocab-name">Wall</span><span class="vocab-desc">One hard, crisp knock. The only full-strength hit.</span></li>
+            <li data-pattern="window"><span class="vocab-name">Window</span><span class="vocab-desc">A glassy double ping.</span></li>
+            <li data-pattern="doorway"><span class="vocab-name">Doorway</span><span class="vocab-desc">Two quick, light taps.</span></li>
+            <li data-pattern="front"><span class="vocab-name">Front door</span><span class="vocab-desc">Tap, tap, pause, tap. A chime in 3D sound points the way to it.</span></li>
+            <li data-pattern="stairs"><span class="vocab-name">Stairs</span><span class="vocab-desc">A ladder of taps, rising going up.</span></li>
+            <li data-pattern="hardwood"><span class="vocab-name">Hardwood</span><span class="vocab-desc">Three light, dull ticks per step, fading.</span></li>
+            <li data-pattern="tile"><span class="vocab-name">Tile</span><span class="vocab-desc">Two soft pulses per step, spaced apart.</span></li>
+            <li data-pattern="carpet"><span class="vocab-name">Carpet</span><span class="vocab-desc">A smooth swell with no hits.</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section agents" id="agents" aria-labelledby="agents-title">
+      <div class="wrap agents-grid">
+        <div>
+          <h2 id="agents-title">What you could offer a blind client</h2>
+          <p class="section-lede">A photo gallery and a video tour are both made for eyes. Haptix gives your client the layout itself.</p>
+        </div>
+        <dl class="offer">
+          <div>
+            <dt>The real layout</dt>
+            <dd>Rooms, doors, sizes, and floor types come from the listing's own floor plan, traced into the app.</dd>
+          </div>
+          <div>
+            <dt>Explored alone</dt>
+            <dd>Your client learns the house at their own pace, without someone narrating it for them.</dd>
+          </div>
+          <div>
+            <dt>Questions answered on the spot</dt>
+            <dd>Directions always come from the way the walker faces: "Front door behind you, 7 steps."</dd>
+          </div>
+        </dl>
+        <p class="early">Haptix is an early prototype. No one can download it yet, and it hasn't been tested with blind buyers yet. We're looking for a few agents to try it with us.</p>
+      </div>
+    </section>
+
+    <section class="section orgs" id="orgs" aria-labelledby="orgs-title">
+      <div class="wrap agents-grid">
+        <div>
+          <h2 id="orgs-title">For groups that serve blind and low-vision people</h2>
+          <p class="section-lede">We haven't tested Haptix with blind users yet, and we want to get it right. We're looking for a few organizations to help.</p>
+        </div>
+        <dl class="offer">
+          <div>
+            <dt>Shape it early</dt>
+            <dd>Your staff and members tell us which cues help and which get in the way, before we build more.</dd>
+          </div>
+          <div>
+            <dt>Talk with us</dt>
+            <dd>A 15-minute call about what your members need when they look for a home.</dd>
+          </div>
+          <div>
+            <dt>Pick what's next</dt>
+            <dd>Directions to a chosen room, furniture layouts, or real listings. Tell us which matters most.</dd>
+          </div>
+        </dl>
+        <p><a class="button" href="#demo">Talk with us</a></p>
+      </div>
+    </section>
+
+    <section class="section team" id="team" aria-labelledby="team-title">
+      <div class="wrap team-row">
+        <h2 id="team-title">Built at Hack to the Future</h2>
+        <p>We're college students, and we took a lot of virtual tours looking for apartments for next year. It made us wonder how a blind renter would tour a place the same way. Haptix is our answer.</p>
+        <p>It took 3rd place at Hack to the Future, UIUC's product hackathon, in October 2026. We're Edison Hui, Pradyun Pinapala, Devansh Lal, and Jonathan Zhao, and we're still building it.</p>
+        <p><a href="https://devpost.com/software/blind-virtual-tour">Read our hackathon write-up on Devpost</a></p>
+      </div>
+    </section>
+
+    <section class="section demo" id="demo" aria-labelledby="demo-title">
+      <div class="wrap demo-grid">
+        <div class="demo-copy">
+          <h2 id="demo-title">Book a 15-minute demo</h2>
+          <p class="section-lede">We'll walk you through Haptix on a real floor plan, over a video call or in person around Champaign. Organizations can use this form to set up a call too.</p>
+        </div>
+
+        <form class="demo-form" id="demo-form" novalidate>
+          <div class="field">
+            <label for="f-name">Your name</label>
+            <input id="f-name" name="name" type="text" autocomplete="name" required aria-describedby="f-name-error">
+            <p class="error" id="f-name-error" hidden>Enter your name.</p>
+          </div>
+          <div class="field">
+            <label for="f-email">Email</label>
+            <input id="f-email" name="email" type="email" autocomplete="email" required aria-describedby="f-email-error">
+            <p class="error" id="f-email-error" hidden>Enter an email we can reply to, like name@brokerage.com.</p>
+          </div>
+          <fieldset class="field">
+            <legend>Who are you?</legend>
+            <div class="choice-row">
+              <label class="choice"><input type="radio" name="role" value="Real estate agent" checked> <span>Real estate agent</span></label>
+              <label class="choice"><input type="radio" name="role" value="Organization"> <span>An organization</span></label>
+              <label class="choice"><input type="radio" name="role" value="Other"> <span>Something else</span></label>
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="f-brokerage">Brokerage or organization <span class="optional">(optional)</span></label>
+            <input id="f-brokerage" name="brokerage" type="text" autocomplete="organization">
+          </div>
+          <fieldset class="field">
+            <legend>How should we meet?</legend>
+            <div class="choice-row">
+              <label class="choice"><input type="radio" name="meeting" value="Video call" checked> <span>Video call</span></label>
+              <label class="choice"><input type="radio" name="meeting" value="In person"> <span>In person, around Champaign</span></label>
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="f-message">Anything we should know? <span class="optional">(optional)</span></label>
+            <textarea id="f-message" name="message" rows="3"></textarea>
+          </div>
+          <div class="honey" aria-hidden="true">
+            <label for="f-honey">Leave this empty</label>
+            <input id="f-honey" name="_honey" type="text" tabindex="-1" autocomplete="off">
+          </div>
+          <button class="button" type="submit">Request a demo</button>
+          <p class="form-status" id="form-status" role="status"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-row">
+      <p><span class="wordmark-print">Haptix</span> <span class="braille" data-braille="haptix" aria-hidden="true"></span></p>
+      <p>Floor plans you can feel. Made by the Haptix team, 2026.</p>
+    </div>
+  </footer>
+
+  <script src="plan.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
