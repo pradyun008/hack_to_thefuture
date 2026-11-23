@@ -2,8 +2,10 @@
   "use strict";
 
   // Where demo requests go. Empty means this draft isn't connected yet.
-  // For FormSubmit, use "https://formsubmit.co/ajax/<team inbox>".
-  const FORM_ENDPOINT = "https://formsubmit.co/ajax/haptixteam@gmail.com";
+  // Web3Forms emails each request to haptixteam@gmail.com. The access key is
+  // public by design: Web3Forms' own setup puts it in the page's HTML.
+  const FORM_ENDPOINT = "https://api.web3forms.com/submit";
+  const FORM_KEY = "53a5d2de-cf0a-4b7e-87f8-5da42d8df6f8";
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const css = getComputedStyle(document.documentElement);
@@ -999,19 +1001,35 @@
     status.textContent = "Sending...";
     try {
       const timeout = new AbortController();
-      // FormSubmit can take most of a minute to answer, so say so instead of looking stuck.
+      // If the form service is slow, say so instead of looking stuck.
       const timer = setTimeout(() => timeout.abort(), 70000);
       slow = setTimeout(() => { status.textContent = "Still sending. This can take up to a minute."; }, 6000);
       const res = await fetch(FORM_ENDPOINT, {
         signal: timeout.signal,
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ ...data, _subject: "Haptix demo request" }),
+        // Plain form data needs no CORS preflight, which some services block.
+        headers: { Accept: "application/json" },
+        body: (() => {
+          const fd = new FormData();
+          const fields = {
+            access_key: FORM_KEY,
+            subject: `Haptix demo request from ${data.name}`,
+            from_name: "Haptix website",
+            replyto: data.email,
+            name: data.name,
+            email: data.email,
+            brokerage: data.brokerage || "",
+            meeting: data.meeting,
+            message: data.message || "",
+          };
+          Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
+          return fd;
+        })(),
       });
       clearTimeout(timer);
       clearTimeout(slow);
       if (!res.ok) throw new Error(String(res.status));
-      // FormSubmit answers 200 even when it refuses, with success: "false".
+      // Form services can answer 200 and still refuse, with success: false.
       const reply = await res.json().catch(() => ({}));
       if (String(reply.success) === "false") throw new Error(reply.message || "refused");
       form.reset();
