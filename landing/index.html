@@ -26,6 +26,7 @@
         <ul class="nav-list">
           <li><a href="#how">How it works</a></li>
           <li><a href="#agents">For agents</a></li>
+          <li><a href="#orgs">For organizations</a></li>
           <li><a href="#team">Team</a></li>
         </ul>
       </nav>
@@ -144,6 +145,30 @@
       </div>
     </section>
 
+    <section class="section orgs" id="orgs" aria-labelledby="orgs-title">
+      <div class="wrap agents-grid">
+        <div>
+          <h2 id="orgs-title">For groups that serve blind and low-vision people</h2>
+          <p class="section-lede">We haven't tested Haptix with blind users yet, and we want to get it right. We're looking for a few organizations to help.</p>
+        </div>
+        <dl class="offer">
+          <div>
+            <dt>Shape it early</dt>
+            <dd>Your staff and members tell us which cues help and which get in the way, before we build more.</dd>
+          </div>
+          <div>
+            <dt>Talk with us</dt>
+            <dd>A 15-minute call about what your members need when they look for a home.</dd>
+          </div>
+          <div>
+            <dt>Pick what's next</dt>
+            <dd>Directions to a chosen room, furniture layouts, or real listings. Tell us which matters most.</dd>
+          </div>
+        </dl>
+        <p><a class="button" href="#demo">Talk with us</a></p>
+      </div>
+    </section>
+
     <section class="section team" id="team" aria-labelledby="team-title">
       <div class="wrap team-row">
         <h2 id="team-title">Built at Hack to the Future</h2>
@@ -157,7 +182,7 @@
       <div class="wrap demo-grid">
         <div class="demo-copy">
           <h2 id="demo-title">Book a 15-minute demo</h2>
-          <p class="section-lede">We'll walk you through Haptix on a real floor plan, over a video call or in person around Champaign.</p>
+          <p class="section-lede">We'll walk you through Haptix on a real floor plan, over a video call or in person around Champaign. Organizations can use this form to set up a call too.</p>
         </div>
 
         <form class="demo-form" id="demo-form" novalidate>
@@ -171,8 +196,16 @@
             <input id="f-email" name="email" type="email" autocomplete="email" required aria-describedby="f-email-error">
             <p class="error" id="f-email-error" hidden>Enter an email we can reply to, like name@brokerage.com.</p>
           </div>
+          <fieldset class="field">
+            <legend>Who are you?</legend>
+            <div class="choice-row">
+              <label class="choice"><input type="radio" name="role" value="Real estate agent" checked> <span>Real estate agent</span></label>
+              <label class="choice"><input type="radio" name="role" value="Organization"> <span>An organization</span></label>
+              <label class="choice"><input type="radio" name="role" value="Other"> <span>Something else</span></label>
+            </div>
+          </fieldset>
           <div class="field">
-            <label for="f-brokerage">Brokerage <span class="optional">(optional)</span></label>
+            <label for="f-brokerage">Brokerage or organization <span class="optional">(optional)</span></label>
             <input id="f-brokerage" name="brokerage" type="text" autocomplete="organization">
           </div>
           <fieldset class="field">

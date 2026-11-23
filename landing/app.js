@@ -1013,9 +1013,10 @@
           const fd = new FormData();
           const fields = {
             access_key: FORM_KEY,
-            subject: `Haptix demo request from ${data.name}`,
+            subject: `Haptix demo request from ${data.name} (${data.role || "unknown"})`,
             from_name: "Haptix website",
             replyto: data.email,
+            role: data.role || "",
             name: data.name,
             email: data.email,
             brokerage: data.brokerage || "",
