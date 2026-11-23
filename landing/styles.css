@@ -413,9 +413,8 @@ a:hover { color: var(--ink); }
 .team-row { display: grid; gap: var(--space-2); }
 .team-row p { color: var(--ink-2); font-size: var(--step-1); line-height: 1.45; max-width: 44rem; }
 
-/* Demo form */
-.demo { background: var(--ink); color: #fff; border-top: 0; }
-.demo .section-lede { color: #c5d0e0; }
+/* Demo form: the same paper card as the map, on the page's own ground. */
+.demo { border-top: 1px solid var(--line); }
 .demo-grid { display: grid; gap: var(--space-4); }
 .demo-form {
   display: grid;
@@ -424,24 +423,29 @@ a:hover { color: var(--ink); }
   background: var(--paper);
   color: var(--ink);
   border-radius: 16px;
+  box-shadow: var(--shadow-raised);
 }
+.demo-form .button { width: 100%; }
 .field { display: grid; gap: 0.4rem; margin: 0; padding: 0; border: 0; min-width: 0; }
-.field label, .field legend { font-weight: 700; font-size: var(--step--1); padding: 0; }
+.field label, .field legend { font-weight: 400; font-size: var(--step--1); color: var(--ink-2); padding: 0; }
 .field legend { margin-bottom: 0.4rem; }
-.optional { font-weight: 400; color: var(--ink-2); }
+.optional { color: var(--ink-2); }
+/* Filled fields. The bottom edge keeps a 3:1 outline so the field still reads as a field. */
 input[type="text"], input[type="email"], textarea {
   width: 100%;
   min-height: 3rem;
   padding: 0.7rem 0.9rem;
-  border: 1.5px solid #8796ab;
-  border-radius: 8px;
-  background: #fff;
+  border: 1.5px solid transparent;
+  border-bottom-color: #74839a;
+  border-radius: 10px;
+  background: #e9eef4;
   color: var(--ink);
   font: inherit;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 textarea { resize: vertical; min-height: 6rem; }
-input:hover, textarea:hover { border-color: var(--ink-2); }
-input:focus-visible, textarea:focus-visible { outline-offset: 1px; border-color: var(--accent); }
+input:hover, textarea:hover { background: #e2e8f0; }
+input:focus-visible, textarea:focus-visible { outline-offset: 1px; background: #fff; border-color: var(--accent); }
 input[aria-invalid="true"] { border-color: var(--error); }
 .error { color: var(--error); font-size: var(--step--1); font-weight: 700; }
 .choice-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
@@ -451,12 +455,13 @@ input[aria-invalid="true"] { border-color: var(--error); }
   gap: 0.55rem;
   min-height: 3rem;
   padding: 0 1rem;
-  border: 1.5px solid #8796ab;
-  border-radius: 8px;
-  background: #fff;
+  border: 1.5px solid transparent;
+  border-bottom-color: #74839a;
+  border-radius: 10px;
+  background: #e9eef4;
   cursor: pointer;
 }
-.field .choice { padding: 0 1rem; font-weight: 400; }
+.field .choice { padding: 0 1rem; font-weight: 400; color: var(--ink); }
 .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-wash); }
 .choice input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; margin: 0; }
 .honey { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
