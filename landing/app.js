@@ -992,14 +992,16 @@
       status.textContent = "This draft isn't connected to our inbox yet, so nothing was sent.";
       return;
     }
+    let slow = null;
     const button = form.querySelector("button[type=submit]");
     button.disabled = true;
     status.className = "form-status";
     status.textContent = "Sending...";
     try {
-      // Give up after 15 s so a slow form service never leaves "Sending..." up forever.
       const timeout = new AbortController();
-      const timer = setTimeout(() => timeout.abort(), 15000);
+      // FormSubmit can take most of a minute to answer, so say so instead of looking stuck.
+      const timer = setTimeout(() => timeout.abort(), 70000);
+      slow = setTimeout(() => { status.textContent = "Still sending. This can take up to a minute."; }, 6000);
       const res = await fetch(FORM_ENDPOINT, {
         signal: timeout.signal,
         method: "POST",
@@ -1007,11 +1009,16 @@
         body: JSON.stringify({ ...data, _subject: "Haptix demo request" }),
       });
       clearTimeout(timer);
+      clearTimeout(slow);
       if (!res.ok) throw new Error(String(res.status));
+      // FormSubmit answers 200 even when it refuses, with success: "false".
+      const reply = await res.json().catch(() => ({}));
+      if (String(reply.success) === "false") throw new Error(reply.message || "refused");
       form.reset();
       status.className = "form-status ok";
       status.textContent = "Thanks. We'll email you within a few days to set a time.";
     } catch (_) {
+      clearTimeout(slow);
       status.className = "form-status bad";
       status.textContent = "That didn't send. Try again, or email us at haptixteam@gmail.com.";
     } finally {
