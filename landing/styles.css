@@ -6,6 +6,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Funnel Display";
+  src: url("fonts/funnel-display-latin.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --ground: #edf1f5;
   --paper: #f9fbfd;
@@ -20,6 +28,7 @@
   --ok: #1d6b3a;
 
   --font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-display: "Funnel Display", "Atkinson Hyperlegible Next", system-ui, sans-serif;
   --step--1: 0.9375rem;
   --step-0: 1.125rem;
   --step-1: 1.375rem;
@@ -60,10 +69,10 @@ body {
 
 ::selection { background: var(--accent); color: #fff; }
 
-h1, h2, h3 { margin: 0; line-height: 1.08; text-wrap: balance; }
-h1 { font-size: var(--step-3); font-weight: 800; letter-spacing: -0.025em; }
-h2 { font-size: var(--step-2); font-weight: 800; letter-spacing: -0.02em; }
-h3 { font-size: var(--step-1); font-weight: 700; letter-spacing: -0.01em; }
+h1, h2, h3 { margin: 0; line-height: 1.06; text-wrap: balance; font-family: var(--font-display); }
+h1 { font-size: var(--step-3); font-weight: 600; letter-spacing: -0.03em; }
+h2 { font-size: var(--step-2); font-weight: 600; letter-spacing: -0.025em; }
+h3 { font-size: var(--step-1); font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; text-wrap: pretty; }
 
 a { color: var(--accent-deep); text-underline-offset: 0.2em; text-decoration-thickness: 1.5px; }
@@ -286,6 +295,33 @@ a:hover { color: var(--ink); }
   transition-duration: 0s;
 }
 #reset { justify-self: end; align-self: center; }
+.demo-note {
+  grid-column: 1 / -1;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.ears { padding: var(--space-2) 0.25rem 0; }
+.ears-title {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: 0.4rem;
+}
+.ears-source { color: var(--accent-deep); }
+.ears-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: 1.6rem 1.6rem;
+  column-gap: var(--space-2);
+  align-items: center;
+}
+.ear-label { grid-column: 1; font-size: 0.8125rem; font-weight: 700; color: var(--ink-2); }
+#ears { grid-column: 2; grid-row: 1 / 3; width: 100%; height: 100%; display: block; }
 
 /* Sections */
 .section { padding-block: var(--space-6); }
@@ -447,8 +483,22 @@ input[aria-invalid="true"] { border-color: var(--error); }
   .vocab-desc { grid-column: 1 / 2; }
   .rhythm { grid-column: 1; grid-row: 3; }
   .play { grid-column: 2; grid-row: 3; }
-  .explorer { padding: 0.75rem; }
+  .explorer { margin-inline: -1rem; padding: 0.75rem 0; border-radius: 0; }
+  .explorer-bar, .explorer figcaption, .ears { padding-inline: 1rem; }
+  #plan { border-radius: 0; }
   #reset { justify-self: start; grid-column: 1 / -1; }
+}
+
+/* Arrival: the copy rises in, then the plan card, then the plan prints itself. */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy > * { animation: rise 0.9s var(--ease-out) both; }
+  .hero-copy > :nth-child(2) { animation-delay: 0.09s; }
+  .hero-copy > :nth-child(3) { animation-delay: 0.18s; }
+  .explorer { animation: rise 1.1s var(--ease-out) 0.12s both; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(16px); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

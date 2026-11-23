@@ -3,7 +3,7 @@
 
   // Where demo requests go. Empty means this draft isn't connected yet.
   // For FormSubmit, use "https://formsubmit.co/ajax/<team inbox>".
-  const FORM_ENDPOINT = "";
+  const FORM_ENDPOINT = "https://formsubmit.co/ajax/haptixteam@gmail.com";
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const css = getComputedStyle(document.documentElement);
@@ -54,7 +54,28 @@
   let soundOn = false;
   const soundToggle = document.getElementById("sound-toggle");
 
+  // iPhones mute Web Audio when the ringer switch is off. Playing a silent
+  // <audio> element first moves the page into the "playback" category.
+  let unlocked = false;
+  function unlockIOS() {
+    if (unlocked) return;
+    unlocked = true;
+    const rate = 8000, n = 800, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+    const str = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+    str(0, "RIFF"); v.setUint32(4, 36 + n, true); str(8, "WAVEfmt "); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate, true);
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, "data"); v.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+    const el = document.createElement("audio");
+    el.setAttribute("x-webkit-airplay", "deny");
+    el.preload = "auto";
+    el.loop = true;
+    el.src = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+    el.play().catch(() => { unlocked = false; });
+  }
+
   function ensureAudio() {
+    unlockIOS();
     if (!audio) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return null;
@@ -64,7 +85,7 @@
     return audio;
   }
 
-  function tone({ freq = 440, dur = 0.08, gain = 0.2, type = "sine", pan = 0, at = 0, drop = 0 }) {
+  function tone({ freq = 440, dur = 0.08, gain: level = 0.2, type = "sine", pan = 0, at = 0, drop = 0 }) {
     const ctx = ensureAudio();
     if (!ctx) return;
     const t = ctx.currentTime + at;
@@ -74,7 +95,7 @@
     osc.frequency.setValueAtTime(freq, t);
     if (drop) osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq * drop), t + dur);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(Math.min(0.9, level * 2), t + 0.004);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     let node = osc.connect(g);
     if (ctx.createStereoPanner) {
@@ -88,18 +109,18 @@
   }
 
   const SOUNDS = {
-    wall: (pan) => { tone({ freq: 180, dur: 0.09, gain: 0.5, type: "triangle", drop: 0.4, pan }); tone({ freq: 900, dur: 0.02, gain: 0.12, type: "square", pan }); },
+    wall: (pan) => { tone({ freq: 180, dur: 0.09, gain: 0.5, type: "triangle", drop: 0.4, pan }); tone({ freq: 900, dur: 0.03, gain: 0.12, type: "square", pan }); },
     window: (pan) => { tone({ freq: 2600, dur: 0.12, gain: 0.12, pan }); tone({ freq: 3100, dur: 0.12, gain: 0.1, pan, at: 0.09 }); },
     screen: (pan) => { tone({ freq: 400, dur: 0.05, gain: 0.18, type: "triangle", pan }); tone({ freq: 5000, dur: 0.06, gain: 0.02, type: "sawtooth", pan, at: 0.02 }); },
-    doorway: (pan) => { tone({ freq: 1200, dur: 0.03, gain: 0.12, pan }); tone({ freq: 1200, dur: 0.03, gain: 0.12, pan, at: 0.11 }); },
+    doorway: (pan) => { tone({ freq: 1200, dur: 0.05, gain: 0.12, pan }); tone({ freq: 1200, dur: 0.05, gain: 0.12, pan, at: 0.11 }); },
     opening: (pan) => tone({ freq: 700, dur: 0.05, gain: 0.08, pan }),
     front: (pan) => {
-      [0, 0.14, 0.48].forEach((at) => tone({ freq: 1000, dur: 0.03, gain: 0.12, pan, at }));
+      [0, 0.14, 0.48].forEach((at) => tone({ freq: 1000, dur: 0.05, gain: 0.12, pan, at }));
       tone({ freq: 660, dur: 0.35, gain: 0.14, pan, at: 0.62 });
       tone({ freq: 880, dur: 0.5, gain: 0.12, pan, at: 0.82 });
     },
-    stairs: () => [0, 0.09, 0.18, 0.27, 0.36].forEach((at, i) => tone({ freq: 500 + i * 140, dur: 0.03, gain: 0.1, at })),
-    hardwood: () => [0, 0.09, 0.18].forEach((at, i) => tone({ freq: 320, dur: 0.03, gain: 0.12 - i * 0.03, type: "triangle", at })),
+    stairs: () => [0, 0.09, 0.18, 0.27, 0.36].forEach((at, i) => tone({ freq: 500 + i * 140, dur: 0.05, gain: 0.1, at })),
+    hardwood: () => [0, 0.09, 0.18].forEach((at, i) => tone({ freq: 320, dur: 0.05, gain: 0.12 - i * 0.03, type: "triangle", at })),
     tile: () => [0, 0.22].forEach((at) => tone({ freq: 520, dur: 0.07, gain: 0.08, at })),
     carpet: () => tone({ freq: 140, dur: 0.3, gain: 0.12 }),
   };
@@ -171,7 +192,10 @@
     btn.setAttribute("aria-label", `Play the ${NAMES[key]} pattern`);
     btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>';
     btn.addEventListener("click", () => {
-      feel(key);
+      // Pressing play is asking for the sound, whatever the map's sound switch says.
+      ensureAudio();
+      SOUNDS[key]();
+      if (navigator.vibrate && VIBRATE[key]) navigator.vibrate(VIBRATE[key]);
       beats.forEach((b) => {
         const ms = Number(b.dataset.ms || 0);
         setTimeout(() => {
@@ -187,10 +211,15 @@
   /* ---------- Floor plan explorer ---------- */
   const PLAN = window.HAPTIX_PLAN;
   const canvas = document.getElementById("plan");
-  if (!PLAN || !canvas || !canvas.getContext) return;
+  if (PLAN && canvas && canvas.getContext) initExplorer();
 
+  function initExplorer() {
   const ctx = canvas.getContext("2d");
   const readout = document.getElementById("readout");
+  const demoNote = document.getElementById("demo-note");
+  const earsCanvas = document.getElementById("ears");
+  const earsCtx = earsCanvas ? earsCanvas.getContext("2d") : null;
+  const earsSource = document.getElementById("ears-source");
   const chips = new Map([...document.querySelectorAll("[data-chip]")].map((el) => [el.dataset.chip, el]));
   const W_FT = PLAN.cols * PLAN.cell;
   const H_FT = PLAN.rows * PLAN.cell;
@@ -200,6 +229,8 @@
   // Label spots (feet) where the room's centre falls on a wall or the stairs.
   const LABEL_SPOT = { Foyer: [26.4, 39.9], Stairs: [18.6, 34.3] };
   const CONTACT_WORD = { wall: "Wall.", window: "Window.", screen: "Porch screen." };
+  // The demo walk: front door, kitchen, dining area, family room, porch.
+  const DEMO_PATH = [[22.4, 39.6], [27.4, 38.6], [27.4, 31], [27.4, 25.5], [22, 22], [33, 21.5], [45, 20], [48.4, 15.5], [46.5, 10]];
 
   const rooms = PLAN.rooms.map((r, i) => ({ ...r, i, x: r.bounds[0], y: r.bounds[1], w: r.bounds[2], h: r.bounds[3], area: r.bounds[2] * r.bounds[3] }));
 
@@ -236,6 +267,10 @@
     const kind = d.kind === "exterior" ? (d.name === "Front door" ? "front" : "exterior") : d.kind;
     return { ...d, seg, kind, armed: true };
   });
+  const frontDoor = doors.find((d) => d.kind === "front");
+  const frontPoint = frontDoor
+    ? { x: (frontDoor.seg[0] + frontDoor.seg[2]) / 2, y: (frontDoor.seg[1] + frontDoor.seg[3]) / 2 }
+    : { x: PLAN.front.x, y: PLAN.front.y };
 
   function distToSeg(px, py, [x1, y1, x2, y2]) {
     const dx = x2 - x1, dy = y2 - y1;
@@ -254,6 +289,7 @@
   /* State */
   const start = { x: PLAN.start.x, y: PLAN.start.y };
   const walker = { x: start.x, y: start.y };
+  const heading = { x: 0, y: -1 };
   let target = null;
   const keys = new Set();
   let rings = [];
@@ -267,11 +303,55 @@
   let pendingSince = 0;
   let scale = 1;
   let dpr = 1;
+  let rotated = false;
   let staticLayer = null;
   let interacted = false;
+  let printStart = reduceMotion ? -1e9 : null;
+  const PRINT_MS = 1900;
+  let demo = reduceMotion ? null : { i: 0, pauseUntil: 0, lastProgress: 0, best: Infinity };
+  let lastMoveAt = -1e9;
+  let lastBeacon = -1e9;
+
+  // On phones the plan stands upright so it can be drawn bigger.
+  const narrow = window.matchMedia("(max-width: 640px)");
+  const toScreen = (x, y) => (rotated ? [(H_FT - y) * scale, x * scale] : [x * scale, y * scale]);
+  const toPlanXY = (X, Y) => (rotated ? [Y / scale, H_FT - X / scale] : [X / scale, Y / scale]);
+  const screenDirToPlan = (sx, sy) => (rotated ? [sy, -sx] : [sx, sy]);
+
+  /* What the two ears hear: the front door chime placed in 3D, and speech in both. */
+  const EAR_SAMPLES = 56;
+  const earL = new Array(EAR_SAMPLES).fill(0);
+  const earR = new Array(EAR_SAMPLES).fill(0);
+  let levelL = 0, levelR = 0, lastEarTick = 0, sourceUntil = 0;
+
+  function hear(l, r, source, ms = 700) {
+    levelL = Math.min(1, Math.max(levelL, l));
+    levelR = Math.min(1, Math.max(levelR, r));
+    if (earsSource && source) {
+      earsSource.textContent = source;
+      sourceUntil = performance.now() + ms;
+    }
+  }
+
+  function beacon(now) {
+    const dx = frontPoint.x - walker.x, dy = frontPoint.y - walker.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    // Positive means the door is to the walker's right (y grows downward).
+    const rel = Math.atan2(heading.x * dy - heading.y * dx, heading.x * dx + heading.y * dy);
+    const pan = Math.sin(rel);
+    const vol = Math.max(0.3, Math.min(1, 1.15 - dist / 45));
+    const a = ((pan + 1) * Math.PI) / 4;
+    hear(vol * Math.cos(a), vol * Math.sin(a), "Front door chime");
+    if (soundOn) {
+      tone({ freq: 660, dur: 0.22, gain: 0.07 * vol, pan });
+      tone({ freq: 880, dur: 0.3, gain: 0.06 * vol, pan, at: 0.16 });
+    }
+    lastBeacon = now;
+  }
 
   function say(text) {
     readout.textContent = text;
+    hear(0.55, 0.55, "Voice", 900);
   }
 
   function light(chip) {
@@ -286,10 +366,6 @@
     rings.push({ x, y, strength, born: performance.now() + delay });
   }
 
-  function panFor(x) {
-    return ((x - walker.x) / 12) || (x / W_FT) * 2 - 1;
-  }
-
   /* Static layer: the tactile drawing */
   function drawStatic() {
     const w = canvas.width, h = canvas.height;
@@ -299,17 +375,19 @@
     const g = staticLayer.getContext("2d");
     g.scale(dpr, dpr);
     g.fillStyle = PAPER;
-    g.fillRect(0, 0, w, h);
+    g.fillRect(0, 0, w / dpr, h / dpr);
 
     const cellPx = PLAN.cell * scale;
     const dotR = Math.max(1.05, cellPx * 0.36);
 
+    g.save();
+    if (rotated) { g.translate(H_FT * scale, 0); g.rotate(Math.PI / 2); }
     // Raised dots: a soft offset shadow under each, like swell paper.
     g.save();
     g.shadowColor = "rgba(18, 35, 61, 0.35)";
-    g.shadowBlur = Math.max(1, cellPx * 0.35);
-    g.shadowOffsetX = cellPx * 0.12;
-    g.shadowOffsetY = cellPx * 0.22;
+    g.shadowBlur = Math.max(1, cellPx * 0.35) * dpr;
+    g.shadowOffsetX = cellPx * 0.12 * dpr;
+    g.shadowOffsetY = cellPx * 0.22 * dpr;
     for (let r = 0; r < PLAN.rows; r++) {
       const line = PLAN.grid[r];
       for (let c = 0; c < PLAN.cols; c++) {
@@ -335,8 +413,20 @@
     }
     g.restore();
 
-    // Room labels: print, with braille underneath where it fits.
-    const fontPx = Math.max(10, Math.min(15, scale * 1.15));
+    // Entrance mark: the tactile-map convention of a solid triangle.
+    const fd = PLAN.front;
+    const tx = fd.x * scale, ty = (fd.y + 1.6) * scale, ts = Math.max(5, scale * 0.8);
+    g.fillStyle = ACCENT;
+    g.beginPath();
+    g.moveTo(tx, ty - ts);
+    g.lineTo(tx - ts, ty + ts * 0.6);
+    g.lineTo(tx + ts, ty + ts * 0.6);
+    g.closePath();
+    g.fill();
+    g.restore();
+
+    // Room labels stay upright: print, with braille underneath where it fits.
+    const fontPx = Math.max(10.5, Math.min(15, scale * 1.15));
     g.textAlign = "center";
     g.textBaseline = "alphabetic";
     g.font = `700 ${fontPx}px "Atkinson Hyperlegible Next", system-ui, sans-serif`;
@@ -344,26 +434,25 @@
     const bGap = Math.max(3, scale * 0.36);
     const bAdvance = bGap * 2.6;
     for (const r of rooms) {
-      if (r.kind === "closet") continue;
+      if (r.kind === "closet" || (rotated && r.kind === "stairs")) continue;
       const label = r.name === "Formal dining room" ? "Dining room" : r.name;
-      const boxW = r.w * scale - 6;
-      const textW = g.measureText(label).width;
-      if (textW > boxW) continue;
-      const spot = LABEL_SPOT[r.name];
-      const cx = (spot ? spot[0] : r.x + r.w / 2) * scale;
-      const cy = (spot ? spot[1] : r.y + r.h / 2) * scale;
+      const boxW = (rotated ? r.h : r.w) * scale - 6;
+      const boxH = (rotated ? r.w : r.h) * scale;
+      if (g.measureText(label).width > boxW) continue;
+      const spot = LABEL_SPOT[r.name] || [r.x + r.w / 2, r.y + r.h / 2];
+      const [cx, cy] = toScreen(spot[0], spot[1]);
       const word = label.toLowerCase();
       const brailleW = word.length * bAdvance - (bAdvance - bGap);
       const y0 = cy + bGap * 0.9;
       // Braille spells the whole label, and only where every dot lands on open floor.
-      let showBraille = brailleW <= boxW && r.kind !== "stairs" && r.h * scale > fontPx * 3;
+      let showBraille = brailleW <= boxW && r.kind !== "stairs" && boxH > fontPx * 3;
       if (showBraille) {
         let x = cx - brailleW / 2;
         for (const ch of word) {
           for (const d of BRAILLE[ch] || []) {
             const [dx, dy] = DOT_POS[d];
-            const fx = (x + dx * bGap) / scale, fy = (y0 + dy * bGap) / scale;
-            if (cellAt(fx, fy) !== "." || cellAt(fx + 0.5, fy) !== "." || cellAt(fx - 0.5, fy) !== "." || cellAt(fx, fy + 0.5) !== ".") showBraille = false;
+            const [fx, fy] = toPlanXY(x + dx * bGap, y0 + dy * bGap);
+            if (cellAt(fx, fy) !== "." || cellAt(fx + 0.5, fy) !== "." || cellAt(fx - 0.5, fy) !== "." || cellAt(fx, fy + 0.5) !== "." || cellAt(fx, fy - 0.5) !== ".") showBraille = false;
           }
           x += bAdvance;
         }
@@ -384,43 +473,66 @@
         }
       }
     }
-
-    // Entrance mark: the tactile-map convention of a solid triangle.
-    const fd = PLAN.front;
-    const tx = fd.x * scale, ty = (fd.y + 1.6) * scale, ts = Math.max(5, scale * 0.8);
-    g.fillStyle = ACCENT;
-    g.beginPath();
-    g.moveTo(tx, ty - ts);
-    g.lineTo(tx - ts, ty + ts * 0.6);
-    g.lineTo(tx + ts, ty + ts * 0.6);
-    g.closePath();
-    g.fill();
   }
 
   function resize() {
+    rotated = narrow.matches;
+    const across = rotated ? H_FT : W_FT, down = rotated ? W_FT : H_FT;
+    canvas.style.aspectRatio = `${across} / ${down}`;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width) return;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    scale = rect.width / W_FT;
+    scale = rect.width / across;
     canvas.width = Math.round(rect.width * dpr);
-    canvas.height = Math.round(rect.width * (H_FT / W_FT) * dpr);
+    canvas.height = Math.round(rect.width * (down / across) * dpr);
     drawStatic();
+    if (earsCanvas) {
+      const er = earsCanvas.getBoundingClientRect();
+      earsCanvas.width = Math.round(er.width * dpr);
+      earsCanvas.height = Math.round(er.height * dpr);
+    }
     draw(performance.now());
   }
 
+  const easeOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
   function draw(now) {
+    const W = canvas.width, H = canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(staticLayer, 0, 0);
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+
+    // The plan prints in from the top, like an embosser's head passing down the sheet.
+    const printing = printStart === null || now - printStart < PRINT_MS;
+    const p = printStart === null ? 0 : easeOut(Math.min(1, (now - printStart) / PRINT_MS));
+    if (p > 0) {
+      const sh = Math.max(1, Math.round(H * p));
+      ctx.drawImage(staticLayer, 0, 0, W, sh, 0, 0, W, sh);
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (printing) {
+      if (printStart !== null) {
+        const y = (H / dpr) * p;
+        const grad = ctx.createLinearGradient(0, y - 18, 0, y + 2);
+        grad.addColorStop(0, "rgba(39, 71, 245, 0)");
+        grad.addColorStop(1, "rgba(39, 71, 245, 0.22)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, y - 18, W / dpr, 20);
+        ctx.fillStyle = ACCENT;
+        ctx.fillRect(0, y - 1, W / dpr, 2);
+      }
+      return;
+    }
 
     // Footsteps, one every 2.5 ft, the way the app plays floor texture.
     for (const s of steps) {
       const age = (now - s.t) / 2400;
       if (age >= 1) continue;
+      const [sx, sy] = toScreen(s.x, s.y);
       ctx.globalAlpha = 0.35 * (1 - age);
       ctx.fillStyle = ACCENT;
       ctx.beginPath();
-      ctx.arc(s.x * scale, s.y * scale, Math.max(1.5, scale * 0.18), 0, Math.PI * 2);
+      ctx.arc(sx, sy, Math.max(1.5, scale * 0.18), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -430,25 +542,37 @@
       const age = (now - r.born) / 650;
       if (age < 0 || age >= 1) continue;
       const ease = reduceMotion ? 1 : 1 - Math.pow(1 - age, 3);
+      const [rx, ry] = toScreen(r.x, r.y);
       ctx.globalAlpha = (1 - age) * (0.35 + 0.65 * r.strength);
       ctx.strokeStyle = ACCENT;
       ctx.lineWidth = 1 + r.strength * 2.2;
       ctx.beginPath();
-      ctx.arc(r.x * scale, r.y * scale, (0.8 + ease * (1.2 + r.strength * 3.2)) * scale, 0, Math.PI * 2);
+      ctx.arc(rx, ry, (0.8 + ease * (1.2 + r.strength * 3.2)) * scale, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
-    // The walker.
-    const wx = walker.x * scale, wy = walker.y * scale, wr = Math.max(6, RADIUS * 1.25 * scale);
+    // The walker fades in once the print finishes, with a nose showing its heading.
+    const appear = reduceMotion ? 1 : Math.min(1, (now - printStart - PRINT_MS) / 350);
+    const [wx, wy] = toScreen(walker.x, walker.y);
+    const wr = Math.max(6, RADIUS * 1.25 * scale);
+    const [hx, hy] = rotated ? [-heading.y, heading.x] : [heading.x, heading.y];
+    ctx.globalAlpha = appear;
     ctx.fillStyle = "rgba(39, 71, 245, 0.16)";
     ctx.beginPath();
     ctx.arc(wx, wy, wr * 1.9, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowColor = "rgba(26, 51, 199, 0.45)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 2;
     ctx.fillStyle = ACCENT;
+    ctx.beginPath();
+    const ang = Math.atan2(hy, hx);
+    ctx.moveTo(wx + Math.cos(ang) * wr * 1.75, wy + Math.sin(ang) * wr * 1.75);
+    ctx.lineTo(wx + Math.cos(ang + 0.7) * wr * 0.9, wy + Math.sin(ang + 0.7) * wr * 0.9);
+    ctx.lineTo(wx + Math.cos(ang - 0.7) * wr * 0.9, wy + Math.sin(ang - 0.7) * wr * 0.9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowColor = "rgba(26, 51, 199, 0.45)";
+    ctx.shadowBlur = 6 * dpr;
+    ctx.shadowOffsetY = 2 * dpr;
     ctx.beginPath();
     ctx.arc(wx, wy, wr, 0, Math.PI * 2);
     ctx.fill();
@@ -457,17 +581,42 @@
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // A slow invitation pulse until the visitor first moves.
-    if (!interacted && !reduceMotion) {
-      const p = (now % 1800) / 1800;
-      ctx.globalAlpha = 1 - p;
+    // After the demo, a slow pulse invites the visitor to take over.
+    if (!interacted && !demo && !reduceMotion) {
+      const q = (now % 1800) / 1800;
+      ctx.globalAlpha = 1 - q;
       ctx.strokeStyle = ACCENT;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(wx, wy, wr * (1 + p * 1.8), 0, Math.PI * 2);
+      ctx.arc(wx, wy, wr * (1 + q * 1.8), 0, Math.PI * 2);
       ctx.stroke();
-      ctx.globalAlpha = 1;
     }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawEars(now) {
+    if (!earsCtx || !earsCanvas.width) return;
+    if (now - lastEarTick > 45) {
+      lastEarTick = now;
+      earL.shift(); earL.push(levelL);
+      earR.shift(); earR.push(levelR);
+      levelL *= 0.8; levelR *= 0.8;
+      if (earsSource && now > sourceUntil && earsSource.textContent) earsSource.textContent = "";
+    }
+    const W = earsCanvas.width, H = earsCanvas.height;
+    earsCtx.clearRect(0, 0, W, H);
+    const rowH = H / 2, bw = W / EAR_SAMPLES;
+    [earL, earR].forEach((row, k) => {
+      const mid = rowH * k + rowH / 2;
+      for (let i = 0; i < EAR_SAMPLES; i++) {
+        const v = row[i];
+        const hgt = Math.max(1.5 * dpr, v * (rowH - 6 * dpr));
+        earsCtx.fillStyle = v > 0.04 ? ACCENT : "rgba(58, 74, 98, 0.28)";
+        earsCtx.globalAlpha = 0.35 + 0.65 * (i / EAR_SAMPLES);
+        earsCtx.fillRect(i * bw + bw * 0.2, mid - hgt / 2, bw * 0.6, hgt);
+      }
+    });
+    earsCtx.globalAlpha = 1;
   }
 
   function contact(kind, now, x, y) {
@@ -491,13 +640,14 @@
     if (dist < 1e-4) return;
     const n = Math.ceil(dist / 0.12);
     const sx = dx / n, sy = dy / n;
+    const before = { x: walker.x, y: walker.y };
     let touched = null;
     for (let i = 0; i < n; i++) {
       const fx = walker.x + sx, fy = walker.y + sy;
       const hit = blockedBy(fx, fy);
       if (!hit) { walker.x = fx; walker.y = fy; continue; }
       // Push diagonally into a wall and you slide along it.
-      if (!blockedBy(fx, walker.y) && Math.abs(sx) > Math.abs(sy) * 0.3) { walker.x = fx; touched = touched || null; continue; }
+      if (!blockedBy(fx, walker.y) && Math.abs(sx) > Math.abs(sy) * 0.3) { walker.x = fx; continue; }
       if (!blockedBy(walker.x, fy) && Math.abs(sy) > Math.abs(sx) * 0.3) { walker.y = fy; continue; }
       touched = hit;
       const ang = Math.atan2(sy, sx);
@@ -505,6 +655,15 @@
       break;
     }
     if (!touched) contactKind = null;
+    // Heading eases toward the way the walker is going.
+    const mx = walker.x - before.x, my = walker.y - before.y, m = Math.hypot(mx, my);
+    if (m > 1e-3) {
+      heading.x += (mx / m - heading.x) * 0.25;
+      heading.y += (my / m - heading.y) * 0.25;
+      const hl = Math.hypot(heading.x, heading.y) || 1;
+      heading.x /= hl; heading.y /= hl;
+      lastMoveAt = now;
+    }
     afterMove(now);
   }
 
@@ -559,31 +718,54 @@
     }
   }
 
+  // The demo is silent for screen readers: they hear only what the visitor does.
+  function startDemoAnnouncements() {
+    readout.setAttribute("aria-live", "off");
+    if (demoNote) demoNote.hidden = false;
+  }
+
+  function takeOver() {
+    interacted = true;
+    if (demo) endDemo(false);
+    if (printStart === null) printStart = performance.now() - PRINT_MS;
+  }
+
+  function endDemo(finished) {
+    demo = null;
+    target = null;
+    readout.setAttribute("aria-live", "polite");
+    if (demoNote) demoNote.hidden = true;
+    if (finished) say("Your turn. Drag the dot.");
+  }
+
   function toPlan(e) {
     const rect = canvas.getBoundingClientRect();
-    return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
+    const [x, y] = toPlanXY(e.clientX - rect.left, e.clientY - rect.top);
+    return { x, y };
   }
 
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
+    takeOver();
     target = toPlan(e);
-    interacted = true;
     if (soundOn) ensureAudio();
   });
-  canvas.addEventListener("pointermove", (e) => { if (target) target = toPlan(e); });
-  const endDrag = () => { target = null; contactKind = null; };
+  canvas.addEventListener("pointermove", (e) => { if (target && !demo) target = toPlan(e); });
+  const endDrag = () => { if (!demo) target = null; contactKind = null; };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
 
   const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
   canvas.addEventListener("keydown", (e) => {
-    if (ARROWS[e.key]) { e.preventDefault(); keys.add(e.key); interacted = true; }
+    if (ARROWS[e.key]) { e.preventDefault(); takeOver(); keys.add(e.key); }
   });
   canvas.addEventListener("keyup", (e) => { keys.delete(e.key); if (!keys.size) contactKind = null; });
   canvas.addEventListener("blur", () => keys.clear());
 
   document.getElementById("reset").addEventListener("click", () => {
+    takeOver();
     walker.x = start.x; walker.y = start.y;
+    heading.x = 0; heading.y = -1;
     lastStep = { ...walker };
     steps = []; rings = [];
     room = roomAt(walker.x, walker.y);
@@ -593,13 +775,30 @@
   });
 
   doors.forEach((d) => { d.armed = distToSeg(walker.x, walker.y, d.seg) > 2; });
+  if (demo) startDemoAnnouncements();
 
   let last = performance.now();
   let visible = true;
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (target) {
+    const printed = printStart !== null && now - printStart >= PRINT_MS;
+
+    if (demo && printed && now >= demo.pauseUntil) {
+      const [tx, ty] = DEMO_PATH[demo.i];
+      const dx = tx - walker.x, dy = ty - walker.y, dist = Math.hypot(dx, dy);
+      if (dist < 0.2 || now - demo.lastProgress > 1500) {
+        demo.i += 1;
+        demo.best = Infinity;
+        demo.lastProgress = now;
+        demo.pauseUntil = now + 260;
+        if (demo.i >= DEMO_PATH.length) endDemo(true);
+      } else {
+        if (dist < demo.best - 0.05) { demo.best = dist; demo.lastProgress = now; }
+        const step = Math.min(dist, 6.5 * dt);
+        moveBy((dx / dist) * step, (dy / dist) * step, now);
+      }
+    } else if (target && !demo) {
       const dx = target.x - walker.x, dy = target.y - walker.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 0.05) {
@@ -609,22 +808,35 @@
     } else if (keys.size) {
       let vx = 0, vy = 0;
       keys.forEach((k) => { vx += ARROWS[k][0]; vy += ARROWS[k][1]; });
-      const m = Math.hypot(vx, vy) || 1;
-      moveBy((vx / m) * 7 * dt, (vy / m) * 7 * dt, now);
+      const [px, py] = screenDirToPlan(vx, vy);
+      const m = Math.hypot(px, py) || 1;
+      moveBy((px / m) * 7 * dt, (py / m) * 7 * dt, now);
     }
+
+    // Like the app, the front door chime plays every 1.5 s while you're moving.
+    if (printed && now - lastMoveAt < 400 && now - lastBeacon > 1500) beacon(now);
+
     rings = rings.filter((r) => now - r.born < 700);
-    if (visible) draw(now);
+    if (visible) { draw(now); drawEars(now); }
     requestAnimationFrame(frame);
   }
 
   if ("IntersectionObserver" in window) {
-    new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }).observe(canvas);
+    new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      // Print the plan the first time most of it is on screen.
+      if (printStart === null && entry.intersectionRatio >= 0.45) printStart = performance.now();
+    }, { threshold: [0, 0.45] }).observe(canvas);
+  } else if (printStart === null) {
+    printStart = performance.now();
   }
   if ("ResizeObserver" in window) new ResizeObserver(resize).observe(canvas);
   else window.addEventListener("resize", resize);
+  narrow.addEventListener && narrow.addEventListener("change", resize);
   (document.fonts ? document.fonts.ready : Promise.resolve()).then(resize);
   resize();
   requestAnimationFrame(frame);
+  }
 
   /* ---------- Demo form ---------- */
   const form = document.getElementById("demo-form");
@@ -665,18 +877,23 @@
     status.className = "form-status";
     status.textContent = "Sending...";
     try {
+      // Give up after 15 s so a slow form service never leaves "Sending..." up forever.
+      const timeout = new AbortController();
+      const timer = setTimeout(() => timeout.abort(), 15000);
       const res = await fetch(FORM_ENDPOINT, {
+        signal: timeout.signal,
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ ...data, _subject: "Haptix demo request" }),
       });
+      clearTimeout(timer);
       if (!res.ok) throw new Error(String(res.status));
       form.reset();
       status.className = "form-status ok";
       status.textContent = "Thanks. We'll email you within a few days to set a time.";
     } catch (_) {
       status.className = "form-status bad";
-      status.textContent = "That didn't send. Check your connection and try again.";
+      status.textContent = "That didn't send. Try again, or email us at haptixteam@gmail.com.";
     } finally {
       button.disabled = false;
     }

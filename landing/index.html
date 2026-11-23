@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#EDF1F5">
   <meta name="robots" content="noindex">
   <link rel="preload" href="fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/funnel-display-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
 </head>
@@ -55,7 +56,16 @@
             <canvas id="plan" tabindex="0" role="application" aria-roledescription="floor plan explorer" aria-label="First floor of the demo house" aria-describedby="plan-help"></canvas>
             <noscript><p class="noscript">The interactive floor plan needs JavaScript. The rest of the page works without it.</p></noscript>
           </div>
+          <div class="ears" aria-hidden="true">
+            <p class="ears-title">What they hear <span class="ears-source" id="ears-source"></span></p>
+            <div class="ears-grid">
+              <span class="ear-label">Left ear</span>
+              <span class="ear-label">Right ear</span>
+              <canvas id="ears"></canvas>
+            </div>
+          </div>
           <figcaption>
+            <p class="demo-note" id="demo-note" hidden>Playing a short demo. Touch the map to take over.</p>
             <p class="readout" id="readout" aria-live="polite">Foyer. Hardwood.</p>
             <p class="help" id="plan-help">Drag the blue dot, or select the map and use the arrow keys. Walls stop you, the way they stop the walker in the app.</p>
             <ul class="chips" aria-label="Last thing felt">
