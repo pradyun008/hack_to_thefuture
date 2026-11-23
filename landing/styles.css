@@ -250,7 +250,7 @@ a:hover { color: var(--ink); }
   display: block;
   width: 100%;
   aspect-ratio: 61 / 53;
-  touch-action: none;
+  touch-action: manipulation;
   cursor: grab;
   border-radius: 8px;
 }
@@ -300,6 +300,24 @@ a:hover { color: var(--ink); }
   font-size: 0.875rem;
   font-weight: 700;
   color: var(--accent-deep);
+}
+
+.ask {
+  grid-column: 1 / -1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+.ask span { color: var(--ink); }
+.ask[hidden] { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .ask:not([hidden]) { animation: rise 0.5s var(--ease-out); }
 }
 
 .ears { padding: var(--space-2) 0.25rem 0; }

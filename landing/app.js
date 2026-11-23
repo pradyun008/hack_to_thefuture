@@ -153,6 +153,13 @@
     if (soundOn) ensureAudio();
     soundToggle.setAttribute("aria-pressed", String(soundOn));
     soundToggle.querySelector("span").textContent = soundOn ? "Sound on" : "Sound off";
+    // Phones only allow speech that starts from a tap, so say a word now.
+    if (window.speechSynthesis) {
+      try {
+        speechSynthesis.cancel();
+        if (soundOn) speechSynthesis.speak(new SpeechSynthesisUtterance("Sound on."));
+      } catch (_) { /* no voice available */ }
+    }
   });
 
   /* ---------- Haptic vocabulary rhythms ---------- */
@@ -218,6 +225,12 @@
     li.append(svg, btn);
   });
 
+  // Touch screens get touch instructions.
+  if (window.matchMedia("(pointer: coarse)").matches) {
+    const help = document.getElementById("plan-help");
+    if (help) help.textContent = "Drag the blue dot, or tap a room to walk there. Swipe anywhere else on the map to scroll.";
+  }
+
   /* ---------- Floor plan explorer ---------- */
   const PLAN = window.HAPTIX_PLAN;
   const canvas = document.getElementById("plan");
@@ -240,7 +253,8 @@
   const LABEL_SPOT = { Foyer: [26.4, 39.9], Stairs: [18.6, 34.3] };
   const CONTACT_WORD = { wall: "Wall.", window: "Window.", screen: "Porch screen." };
   // The demo walk: front door, kitchen, dining area, family room, porch.
-  const DEMO_PATH = [[22.4, 39.6], [27.4, 38.6], [27.4, 31], [27.4, 25.5], [22, 22], [33, 21.5], [45, 20], [48.4, 15.5], [46.5, 10]];
+  const ASK_AT = 5;
+  const DEMO_PATH = [[22.4, 39.6], [27.4, 38.6], [27.4, 31], [27.4, 25.5], [21.5, 19.8], [33, 21.5], [45, 20], [48.4, 15.5], [46.5, 10]];
 
   const rooms = PLAN.rooms.map((r, i) => ({ ...r, i, x: r.bounds[0], y: r.bounds[1], w: r.bounds[2], h: r.bounds[3], area: r.bounds[2] * r.bounds[3] }));
 
@@ -359,9 +373,34 @@
     lastBeacon = now;
   }
 
-  function say(text) {
+  // With sound on, the page speaks the way the app does. Walls stay silent:
+  // anything the walker touches is a vibration, and words are for names.
+  function say(text, { voice = true } = {}) {
     readout.textContent = text;
     hear(0.55, 0.55, "Voice", 900);
+    if (voice && soundOn && window.speechSynthesis) {
+      try {
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 1.05;
+        speechSynthesis.speak(u);
+      } catch (_) { /* no voice available */ }
+    }
+  }
+
+  // The app's answer to "Where's the front door?" from the kitchen:
+  // the first leg of the route, from the way the walker faces.
+  function frontDoorAnswer() {
+    const named = (d, a, b) => rooms[d.a] && rooms[d.b] && ((rooms[d.a].name === a && rooms[d.b].name === b) || (rooms[d.a].name === b && rooms[d.b].name === a));
+    const door = doors.find((d) => d.kind === "doorway" && named(d, "Foyer", "Kitchen"));
+    if (!door) return "Front door.";
+    const tx = (door.seg[0] + door.seg[2]) / 2, ty = (door.seg[1] + door.seg[3]) / 2;
+    const dx = tx - walker.x, dy = ty - walker.y;
+    const rel = Math.atan2(heading.x * dy - heading.y * dx, heading.x * dx + heading.y * dy);
+    const deg = Math.round(Math.abs((rel * 180) / Math.PI) / 45) * 45;
+    const turn = deg === 0 ? "straight ahead" : deg === 180 ? "turn around" : `turn ${deg} degrees ${rel > 0 ? "right" : "left"}`;
+    const n = Math.max(1, Math.round(Math.hypot(dx, dy) / 2.5));
+    return `Front door. Through the door to Foyer, ${turn}, ${n === 1 ? "1 step" : `${n} steps`}.`;
   }
 
   function light(chip) {
@@ -651,7 +690,7 @@
       feel(kind, 0);
       if (isNew || now - lastWallSay > 1500) {
         lastWallSay = now;
-        say(CONTACT_WORD[kind] || "Wall.");
+        say(CONTACT_WORD[kind] || "Wall.", { voice: kind !== "wall" });
       }
     }
     contactKind = kind;
@@ -746,7 +785,19 @@
     if (demoNote) demoNote.hidden = false;
   }
 
+  const ask = document.getElementById("ask");
+  function askQuestion() {
+    if (ask) {
+      ask.querySelector("span").textContent = "\u201cWhere's the front door?\u201d";
+      ask.hidden = false;
+    }
+    hear(0.4, 0.4, "Their question", 900);
+    setTimeout(() => { if (demo) say(frontDoorAnswer()); }, 1300);
+    setTimeout(() => { if (ask) ask.hidden = true; }, 4200);
+  }
+
   function takeOver() {
+    if (ask) ask.hidden = true;
     interacted = true;
     if (demo) endDemo(false);
     if (printStart === null) printStart = performance.now() - PRINT_MS;
@@ -766,16 +817,52 @@
     return { x, y };
   }
 
+  // A mouse can drag from anywhere. A finger has to start on the dot, so a
+  // swipe anywhere else still scrolls the page; a tap walks to that spot.
+  let dragging = false;
+  let tap = null;
+  let tapWalk = null;
+  function nearWalker(e) {
+    const rect = canvas.getBoundingClientRect();
+    const [wx, wy] = toScreen(walker.x, walker.y);
+    return Math.hypot(e.clientX - rect.left - wx, e.clientY - rect.top - wy) < 44;
+  }
+  canvas.addEventListener("touchstart", (e) => {
+    const t = e.touches[0];
+    if (e.touches.length === 1 && t && nearWalker(t)) { dragging = true; e.preventDefault(); }
+  }, { passive: false });
+  canvas.addEventListener("touchmove", (e) => { if (dragging) e.preventDefault(); }, { passive: false });
   canvas.addEventListener("pointerdown", (e) => {
+    if (soundOn) ensureAudio();
+    if (e.pointerType === "touch" && !dragging) {
+      tap = { x: e.clientX, y: e.clientY, t: performance.now() };
+      return;
+    }
+    dragging = true;
     canvas.setPointerCapture(e.pointerId);
     takeOver();
+    tapWalk = null;
     target = toPlan(e);
-    if (soundOn) ensureAudio();
   });
-  canvas.addEventListener("pointermove", (e) => { if (target && !demo) target = toPlan(e); });
-  const endDrag = () => { if (!demo) target = null; contactKind = null; };
-  canvas.addEventListener("pointerup", endDrag);
-  canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("pointermove", (e) => { if (dragging && target && !demo) target = toPlan(e); });
+  canvas.addEventListener("pointerup", (e) => {
+    if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 10 && performance.now() - tap.t < 450) {
+      takeOver();
+      target = toPlan(e);
+      tapWalk = { best: Infinity, since: performance.now() };
+    } else if (dragging) {
+      target = null;
+    }
+    tap = null;
+    dragging = false;
+    contactKind = null;
+  });
+  canvas.addEventListener("pointercancel", () => {
+    tap = null;
+    if (dragging) target = null;
+    dragging = false;
+    contactKind = null;
+  });
 
   const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
   canvas.addEventListener("keydown", (e) => {
@@ -816,6 +903,11 @@
         demo.best = Infinity;
         demo.lastProgress = now;
         demo.pauseUntil = now + 260;
+        // In the kitchen, the demo asks a question out loud.
+        if (demo.i === ASK_AT) {
+          demo.pauseUntil = now + 4200;
+          askQuestion();
+        }
         if (demo.i >= DEMO_PATH.length) endDemo(true);
       } else {
         if (dist < demo.best - 0.05) { demo.best = dist; demo.lastProgress = now; }
@@ -825,8 +917,13 @@
     } else if (target && !demo) {
       const dx = target.x - walker.x, dy = target.y - walker.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > 0.05) {
-        const step = Math.min(dist, 16 * dt);
+      if (tapWalk) {
+        // A tapped spot: walk there, and give up if a wall stops progress.
+        if (dist < tapWalk.best - 0.05) { tapWalk.best = dist; tapWalk.since = now; }
+        if (dist < 0.2 || now - tapWalk.since > 700) { target = null; tapWalk = null; contactKind = null; }
+      }
+      if (target && dist > 0.05) {
+        const step = Math.min(dist, (tapWalk ? 9 : 16) * dt);
         moveBy((dx / dist) * step, (dy / dist) * step, now);
       }
     } else if (keys.size) {
